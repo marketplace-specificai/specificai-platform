@@ -1,0 +1,11 @@
+# Changelog
+
+## 4.9.0
+
+- Playground GPU pod runs an in-pod supervisor/router (`specificai-vllm-inference` 0.3.3 -> 0.6.0): one vLLM engine per base model a task's trained models need, multiplexed on a single GPU with vLLM level-1 sleep mode (weights parked in host RAM, exactly one engine awake behind a GPU lock). LoRAs are always served on the base they were trained on; the backend routes each call with the `X-SpecificAI-Base` header and gates session readiness per task on `/admin/healthz`.
+- Train -> Advanced "Base model selection" for generative tasks (summarization / content generation), backed by the decoder registry via `GET /generative-base-models`; the per-task choice persists on the usecase and drives training. `POST /update_selected_base_distilled_model` now requires Editor/Admin and validates against the registry.
+- vLLM wrapper image moves to upstream `vllm/vllm-openai:v0.28.0` (sleep mode requires >= 0.28.0). `specificai-vllm-inference.model.gpuMemoryUtilization` defaults to 0.65 (flat per engine; fits K=5 on a 16 GB T4) and the pod memory request/limit is raised to 40Gi/52Gi so all sleeping engines' weights fit in RAM (AWS gpu-basic promotes g5.2xlarge -> g5.4xlarge).
+- New `common.secrets.supervisorAdminToken` (`SUPERVISOR_ADMIN_TOKEN`) gates the supervisor's `/admin/prepare` and `/admin/healthz`; auto-generated on first install when the chart manages the secret, shared with the backend via the same Secret. `/admin/ping` stays open for probes.
+- Optional `specificai-vllm-inference.models.pvc.s3.volumeHandle` / `bucketName` so the vLLM models PV can share the backend bucket and pin a unique cluster-scoped Mountpoint-S3 handle (empty keeps the namespace-prefixed template default). `backend.storage.s3.volumeHandle` is documented as the matching optional override (default stays `s3-csi-driver-volume` for single-namespace / one-bucket installs).
+- AWS Karpenter NodePools apply the official Mountpoint-S3 CSI startup taint `s3.csi.aws.com/agent-not-ready:NoExecute` so nodes wait until s3-csi-node registers before workloads schedule.
+- `global.vllmBaseModel` and the deployment-handler `VLLM_BASE_MODEL` default now come from the decoder registry's inference weights id; the live Playground pod no longer reads a single global base.

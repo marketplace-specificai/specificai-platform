@@ -1,0 +1,81 @@
+# ==============================================================================
+# Cluster type: GCP GKE — Standard
+# ==============================================================================
+# WARNING: This file is for GKE Standard ONLY. Helm has no way to detect which
+# mode your cluster actually runs in. Applying this file's
+# global.computeClasses.create=true to a GKE Autopilot cluster does not do
+# what you would expect (Autopilot already manages its own compute classes)
+# and can leave GPU pods pending indefinitely. Use gcp-autopilot.values.yaml
+# instead if your cluster runs GKE Autopilot.
+# ==============================================================================
+#
+# GKE Standard has no Karpenter, so global.computeClasses is this chart's
+# equivalent: it renders a GKE ComputeClass per GPU tier and GKE auto-creates
+# a matching node pool on demand — no Terraform/gcloud pool provisioning or
+# pool-naming convention required (requires GKE 1.33.3-gke.1136000+; older
+# clusters also need cluster-level node auto-provisioning). When this is
+# enabled, the GPU tier selectors below default to the rendered ComputeClasses
+# automatically, so they are left unset here. Unlike Autopilot, GKE Standard
+# nodes (whether auto-created above or pre-built by you) are not guaranteed
+# to ship the NVIDIA device plugin preinstalled, so the chart deploys its own
+# DaemonSet here.
+
+global:
+  cloudProvider: "gcp"
+  # GCP region your cluster runs in, e.g. us-east1.
+  cloudRegion: "<YOUR_GCP_REGION>"
+  # GCS bucket used for object storage (datasets, checkpoints, artifacts).
+  bucketName: "<YOUR_GCS_BUCKET_NAME>"
+  # GCP service account email the platform's Workload Identity binds to.
+  roleId: "<YOUR_SERVICE_ACCOUNT_EMAIL>" # <name>@<project-id>.iam.gserviceaccount.com
+  # Hostname the platform will be served on.
+  optuneAddress: "<YOUR_PLATFORM_HOSTNAME>" # e.g. specificai.yourcompany.com
+
+  # GPU tiers are intentionally left unset: with computeClasses.create below,
+  # they default to the rendered ComputeClass names. CPU tiers default to
+  # "kubernetes.io/os: linux" (any Linux node) unless overridden.
+
+  computeClasses:
+    # GKE Standard only. Renders a ComputeClass per GPU tier so GKE
+    # auto-creates GPU node pools on demand.
+    create: true
+    # GPU driver version GKE installs on auto-created nodes: "default" or "latest".
+    driverVersion: default
+    # What GKE does when no priority rule can be satisfied: DoNotScaleUp
+    # leaves the Pod pending, ScaleUpAnyway falls back to default provisioning.
+    whenUnsatisfiable: DoNotScaleUp
+    # Per-tier accelerator config. Adjust gpuType/machineType/count to match
+    # the GPUs available in your project and region.
+    tiers:
+      gpuHighPerformance:
+        gpuType: nvidia-tesla-a100
+        machineType: a2-highgpu-1g
+        count: 1
+      gpuBasic:
+        gpuType: nvidia-l4
+        machineType: g2-standard-8
+        count: 1
+      gpuLowPerformance:
+        gpuType: nvidia-tesla-t4
+        machineType: n1-standard-8
+        count: 1
+
+  # Alternative when you prefer to pre-create GPU node pools yourself
+  # (Terraform / gcloud) instead of enabling computeClasses above: set
+  # computeClasses.create to false and name your pools "gpu-high-performance",
+  # "gpu-basic", and "gpu-low-performance" — the chart's defaults then target
+  # those pool names automatically via the "cloud.google.com/gke-nodepool"
+  # label, with no selector override needed.
+
+common:
+  # Karpenter does not run on GKE at all (any mode) — the chart fails the
+  # render if this is true here. Always false on GCP.
+  karpenter:
+    createNodePools: false
+
+  # GKE Standard nodes do not come with the NVIDIA device plugin preinstalled
+  # the way Autopilot's do — the chart's own DaemonSet is required for GPU
+  # pods to get scheduled. It selects nodes by the `workload: gpu-*` label,
+  # which the ComputeClass above stamps on its auto-created nodes.
+  nvidiaDevicePlugin:
+    enabled: true

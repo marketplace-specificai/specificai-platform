@@ -1,0 +1,73 @@
+# ==============================================================================
+# Cluster type: GCP GKE — Autopilot
+# ==============================================================================
+# WARNING: This file is for GKE Autopilot ONLY. Helm has no way to detect which
+# mode your cluster actually runs in. Applying gcp-standard.values.yaml's
+# ComputeClass settings to an Autopilot cluster does not do what you would
+# expect (Autopilot already manages its own compute classes) and can leave GPU
+# pods pending indefinitely. Use gcp-standard.values.yaml instead if your
+# cluster runs GKE Standard.
+# ==============================================================================
+#
+# On Autopilot, Google manages nodes and provides its own built-in compute
+# classes — there is nothing for this chart to provision, so
+# global.computeClasses.create MUST stay false here and GPU/CPU tiers are
+# selected directly with Autopilot's own node labels
+# (cloud.google.com/gke-accelerator, cloud.google.com/compute-class).
+# Autopilot also installs the NVIDIA driver and device plugin on GPU nodes
+# itself, so the chart's own device plugin DaemonSet must stay disabled.
+
+global:
+  cloudProvider: "gcp"
+  # GCP region your cluster runs in, e.g. us-east1.
+  cloudRegion: "<YOUR_GCP_REGION>"
+  # GCS bucket used for object storage (datasets, checkpoints, artifacts).
+  bucketName: "<YOUR_GCS_BUCKET_NAME>"
+  # GCP service account email the platform's Workload Identity binds to.
+  roleId: "<YOUR_SERVICE_ACCOUNT_EMAIL>" # <name>@<project-id>.iam.gserviceaccount.com
+  # Hostname the platform will be served on.
+  optuneAddress: "<YOUR_PLATFORM_HOSTNAME>" # e.g. specificai.yourcompany.com
+
+  # Autopilot's own compute classes/accelerator labels — required explicitly
+  # here because Autopilot pools are not named by you, unlike GKE Standard's
+  # "gke-nodepool" label fallback.
+  cpuHighPerformanceNodeSelector:
+    "cloud.google.com/compute-class": "Performance"
+    "cloud.google.com/machine-family": "c4"
+  cpuBasicNodeSelector:
+    "cloud.google.com/compute-class": "Performance"
+    "cloud.google.com/machine-family": "c3"
+  cpuLowPerformanceNodeSelector:
+    "cloud.google.com/compute-class": "Balanced"
+  gpuHighPerformanceNodeSelector:
+    "cloud.google.com/gke-accelerator": "nvidia-tesla-a100"
+  gpuBasicNodeSelector:
+    "cloud.google.com/gke-accelerator": "nvidia-l4"
+  gpuLowPerformanceNodeSelector:
+    "cloud.google.com/gke-accelerator": "nvidia-tesla-t4"
+
+  # Autopilot manages scheduling itself — no tolerations or affinity needed.
+  cpuHighPerformanceTolerations: []
+  cpuBasicTolerations: []
+  cpuLowPerformanceTolerations: []
+  gpuHighPerformanceTolerations: []
+  gpuBasicTolerations: []
+  gpuLowPerformanceTolerations: []
+  affinity: {}
+  tolerations: []
+
+  # Leave false on Autopilot — creating a ComputeClass here does not auto-create
+  # a node pool the way it does on GKE Standard (see gcp-standard.values.yaml).
+  computeClasses:
+    create: false
+
+common:
+  # Karpenter does not run on GKE at all (any mode) — the chart fails the
+  # render if this is true here. Always false on GCP.
+  karpenter:
+    createNodePools: false
+
+  # Autopilot installs the NVIDIA driver and device plugin on GPU nodes
+  # itself. Deploying this chart's DaemonSet on top would duplicate it.
+  nvidiaDevicePlugin:
+    enabled: false

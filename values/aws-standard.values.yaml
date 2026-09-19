@@ -1,0 +1,106 @@
+# ==============================================================================
+# Cluster type: AWS EKS — Standard (self-managed Karpenter)
+# ==============================================================================
+# WARNING: This file is for a standard EKS cluster running your OWN Karpenter
+# controller ONLY. Helm has no way to detect which mode your cluster actually
+# runs in. Applying this file to an EKS Auto Mode cluster (or applying
+# aws-auto-mode.values.yaml here) can leave GPU pods pending indefinitely,
+# because the EC2NodeClass / IAM role Karpenter needs to provision GPU nodes
+# will not exist. Use aws-auto-mode.values.yaml instead if your cluster runs
+# EKS Auto Mode.
+# ==============================================================================
+#
+# On self-managed Karpenter, the chart renders an EC2NodeClass (in addition to
+# the NodePools) so Karpenter knows which AMI, subnets and security groups to
+# launch nodes with — this needs the node IAM role and a discovery tag your
+# subnets/security groups carry. Because these are plain EC2 nodes (not an
+# Auto Mode-managed fleet), the platform must also install the NVIDIA device
+# plugin DaemonSet itself.
+
+global:
+  cloudProvider: "aws"
+  # AWS region your cluster runs in, e.g. us-west-2.
+  cloudRegion: "<YOUR_AWS_REGION>"
+  # S3 bucket used for object storage (datasets, checkpoints, artifacts).
+  bucketName: "<YOUR_S3_BUCKET_NAME>"
+  # IRSA role ARN the platform's ServiceAccount assumes for S3 / other AWS APIs.
+  roleId: "<YOUR_IRSA_ROLE_ARN>" # arn:aws:iam::<account-id>:role/<your-irsa-role>
+  # Hostname the platform will be served on.
+  optuneAddress: "<YOUR_PLATFORM_HOSTNAME>" # e.g. specificai.yourcompany.com
+
+  # Node selectors the chart's own NodePools (rendered below) label their
+  # nodes with. Leaving these unset on AWS reaches job-runner as an empty
+  # selector and the Job is silently never created, so they must be set
+  # explicitly (no chart-side default here, unlike GCP).
+  cpuHighPerformanceNodeSelector:
+    workload: "cpu-basic"
+  cpuBasicNodeSelector:
+    workload: "cpu-basic"
+  cpuLowPerformanceNodeSelector:
+    workload: "cpu-basic"
+  gpuHighPerformanceNodeSelector:
+    workload: "gpu-high-performance"
+  gpuBasicNodeSelector:
+    workload: "gpu-basic"
+  gpuLowPerformanceNodeSelector:
+    workload: "gpu-low-performance"
+
+  # Matching tolerations for the taints the chart's NodePools apply.
+  cpuHighPerformanceTolerations:
+    - key: "instance-type"
+      operator: "Equal"
+      value: "cpu-basic"
+      effect: "NoSchedule"
+  cpuBasicTolerations:
+    - key: "instance-type"
+      operator: "Equal"
+      value: "cpu-basic"
+      effect: "NoSchedule"
+  cpuLowPerformanceTolerations:
+    - key: "instance-type"
+      operator: "Equal"
+      value: "cpu-basic"
+      effect: "NoSchedule"
+  gpuHighPerformanceTolerations:
+    - key: "instance-type"
+      operator: "Equal"
+      value: "gpu-high-performance"
+      effect: "NoSchedule"
+  gpuBasicTolerations:
+    - key: "instance-type"
+      operator: "Equal"
+      value: "gpu-basic"
+      effect: "NoSchedule"
+  gpuLowPerformanceTolerations:
+    - key: "instance-type"
+      operator: "Equal"
+      value: "gpu-low-performance"
+      effect: "NoSchedule"
+
+# S3 model storage backend (used by the backend service's model artifacts).
+backend:
+  s3:
+    region: "<YOUR_AWS_REGION>"
+    bucketName: "<YOUR_S3_BUCKET_NAME>"
+
+common:
+  karpenter:
+    # Render the chart's NodePools AND EC2NodeClass (see
+    # charts/common/templates/nodepool.yaml + nodeclasses.yaml).
+    createNodePools: true
+    # Self-managed: chart renders EC2NodeClass for your own Karpenter
+    # controller to use. This is the default, set explicitly for clarity.
+    mode: "self-managed"
+    # IAM role ARN the rendered EC2NodeClass uses to launch/bootstrap nodes
+    # (the Karpenter "node role", NOT the platform's own IRSA role above).
+    roleArn: "<YOUR_KARPENTER_NODE_ROLE_ARN>" # arn:aws:iam::<account-id>:role/<your-karpenter-node-role>
+    # Tag value Karpenter uses to discover which subnets/security groups it
+    # may use (subnetSelectorTerms / securityGroupSelectorTerms match on the
+    # "karpenter.sh/discovery" tag key with this value).
+    discoveryTag: "<YOUR_KARPENTER_DISCOVERY_TAG_VALUE>"
+
+  # Plain EC2 nodes launched by your own Karpenter controller do not come with
+  # a GPU device plugin preinstalled — the chart must deploy its own
+  # DaemonSet so the kubelet exposes nvidia.com/gpu on GPU nodes.
+  nvidiaDevicePlugin:
+    enabled: true
