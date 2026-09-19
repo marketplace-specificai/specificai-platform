@@ -71,3 +71,10 @@ common:
   # itself. Deploying this chart's DaemonSet on top would duplicate it.
   nvidiaDevicePlugin:
     enabled: false
+
+# Triton reads deployed models straight from object storage. The umbrella chart
+# blanks this value, so it has to be set per cloud: without it the model
+# repository URI renders with no scheme ("://<bucket>/deployed_models") and
+# Triton fails to start.
+specificai-inference:
+  storageProvider: "gs"

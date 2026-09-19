@@ -78,10 +78,13 @@ global:
       effect: "NoSchedule"
 
 # S3 model storage backend (used by the backend service's model artifacts).
+# Must be nested under `storage:` — the backend subchart reads
+# .Values.storage.s3.*, so a bare `backend.s3.*` is silently ignored.
 backend:
-  s3:
-    region: "<YOUR_AWS_REGION>"
-    bucketName: "<YOUR_S3_BUCKET_NAME>"
+  storage:
+    s3:
+      region: "<YOUR_AWS_REGION>"
+      bucketName: "<YOUR_S3_BUCKET_NAME>"
 
 common:
   karpenter:
@@ -97,3 +100,10 @@ common:
   # the same device.
   nvidiaDevicePlugin:
     enabled: false
+
+# Triton reads deployed models straight from object storage. The umbrella chart
+# blanks this value, so it has to be set per cloud: without it the model
+# repository URI renders with no scheme ("://<bucket>/deployed_models") and
+# Triton fails to start.
+specificai-inference:
+  storageProvider: "s3"
