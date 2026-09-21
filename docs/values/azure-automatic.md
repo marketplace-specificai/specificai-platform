@@ -1,3 +1,11 @@
+# Azure AKS Automatic values
+
+`azure-automatic.values.yaml` targets **Azure AKS Automatic** clusters. Download the raw file
+from [`values/azure-automatic.values.yaml`](https://github.com/marketplace-specificai/specificai-platform/blob/main/values/azure-automatic.values.yaml),
+fill in the `<PLACEHOLDER>` values it marks, and pass it to
+`helm upgrade --install` as described in the [install guide](../install.md).
+
+```yaml
 # DO NOT EDIT in the public repository. This file is generated from
 # SpecificAI's private chart sources by
 # tools/marketplace_mirror/transform_content.py and republished on every
@@ -100,3 +108,4 @@ common:
   # avoid double-managing the same device.
   nvidiaDevicePlugin:
     enabled: false
+```

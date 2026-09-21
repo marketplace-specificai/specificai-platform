@@ -1,11 +1,29 @@
+<!--
+  DO NOT EDIT in the public repository. This is the public site's landing
+  page, generated from .devops/docs/customer-facing/public/index.md in
+  SpecificAI's private sources by tools/marketplace_mirror/transform_content.py
+  and republished on every chart release. The private repository's own docs
+  build uses src/index.md instead; the two differ because only the public
+  layout has the changelog and values pages.
+-->
+
 # SpecificAI Platform
 
-Customer documentation for deploying the SpecificAI Platform on your own cloud account.
+SpecificAI Platform is a self-hosted, Kubernetes-native application for
+creating task-specific models. It runs on your own cloud account: your
+datasets, your trained models, and your inference traffic never leave it.
 
-This site is generated from SpecificAI's private monorepo and published on each chart-version release.
+This site is generated from SpecificAI's private sources and republished on
+each chart-version release.
 
-- [AWS requirements](requirements/aws.md)
-- [Azure requirements](requirements/azure.md)
-- [Changelog](changelog.md)
+## Deploying the platform
 
-Starter Helm values for each supported cluster type live in the [`values/`](https://github.com/marketplace-specificai/specificai-platform/tree/main/values) directory of this repository.
+1. Provision the infrastructure for your cloud:
+   [AWS](requirements/aws.md), [Azure](requirements/azure.md), or
+   [GCP](requirements/gcp.md).
+2. Arrange pull access to the chart registry — see
+   [Registry access](registry-access.md).
+3. Pick the [Helm values template](values/index.md) that matches your cluster
+   type and follow the [install guide](install.md).
+
+The [changelog](changelog.md) lists what each chart release contains.

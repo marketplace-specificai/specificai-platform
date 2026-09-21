@@ -37,10 +37,28 @@ theme:
     - search.suggest
     - search.share
 
+# The snippet sources are included into the cloud pages, not served as pages of
+# their own. This only affects rendering — transform_content.py still copies
+# them to the public repo, where that build needs them on disk.
+exclude_docs: |
+  _snippets/
+
 nav:
   - Home: index.md
-  - AWS Requirements: requirements/aws.md
-  - Azure Requirements: requirements/azure.md
+  - Requirements:
+      - AWS: requirements/aws.md
+      - Azure: requirements/azure.md
+      - GCP: requirements/gcp.md
+  - Registry access: registry-access.md
+  - Install guide: install.md
+  - Helm values:
+      - values/index.md
+      - Amazon EKS Auto Mode: values/aws-auto-mode.md
+      - Amazon EKS with self-managed Karpenter: values/aws-standard.md
+      - Azure AKS Automatic: values/azure-automatic.md
+      - Azure AKS Standard: values/azure-standard.md
+      - Google GKE Autopilot: values/gcp-autopilot.md
+      - Google GKE Standard: values/gcp-standard.md
   - Changelog: changelog.md
 
 markdown_extensions:
@@ -55,7 +73,18 @@ markdown_extensions:
       line_spans: __span
       pygments_lang_class: true
   - pymdownx.inlinehilite
-  - pymdownx.snippets
+  # Shared sections (Secrets, Outbound endpoints) live in src/_snippets and are
+  # included by every cloud requirements page. base_path is resolved against the
+  # working directory, which is the repository root for both builds: this site
+  # builds with `mkdocs build -f .devops/docs/customer-facing/mkdocs.yml`, and
+  # the public mirror builds the generated copy of this file from its own repo
+  # root. Listing both docs roots keeps one config working in both layouts —
+  # first match wins, so the private path comes first.
+  - pymdownx.snippets:
+      base_path:
+        - .devops/docs/customer-facing/src
+        - docs
+      check_paths: true
   - pymdownx.tabbed:
       alternate_style: true
   - pymdownx.tasklist:

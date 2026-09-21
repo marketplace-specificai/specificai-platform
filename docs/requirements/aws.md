@@ -1,77 +1,137 @@
-# **![][image1]**
+# SpecificAI Platform — AWS requirements
 
-# **AWS Requirements for SpecificAI Auto Distillation Platform Deployment**
+SpecificAI Platform is a self-hosted, Kubernetes-native application for
+creating task-specific models. It runs entirely inside your own AWS account:
+your datasets, your trained models, and your inference traffic never leave it.
 
-SpecificAI Platform is a self-hosted kubernetes native application for creating task-specific models.  
-SpecificAI is meant to be running on a cloud provider environment, such as AWS / Azure/ GCP.
+This page lists the AWS infrastructure to provision before installing the
+platform Helm chart — the cluster, the node pools, the networking, and the
+managed services the platform connects to. Provision what is described here,
+then install the chart with the values file that matches your cluster.
 
-This document outlines the essential Amazon Web Services (AWS) requirements necessary for the successful deployment and operation of the SpecificAI auto distillation platform on a customer's infrastructure. The implementation is intended to be performed using Terraform, and the solution itself is deployed via Helm.
+Everything on this page is customer-owned. SpecificAI supplies the container
+images, the Helm chart, and updates; you operate the infrastructure they run
+on.
 
-# **Infrastructure and Compute Requirements**
+## Platform compute floor
 
-The SpecificAI Inference solution requires dedicated compute resources to ensure isolation and performance.
+The platform core must have this much capacity schedulable at all times.
 
-## **Platform compute requirements**
+| Resource | Floor |
+|---|---|
+| vCPU | 26 |
+| Memory | 50 GB |
 
-* CPU: 26vCPU  
-* RAM: 50GB
+The floor covers the always-on platform services only. It excludes GPU
+capacity and anything running outside the cluster. Training, evaluation, and
+Playground inference run on GPU nodes that are provisioned on demand and
+released when the work finishes, so GPU capacity is not part of the standing
+footprint and is not billed while the platform is idle.
 
-## **Amazon Elastic Kubernetes Service (EKS)**
+## Managed Kubernetes cluster
 
-The solution will be deployed onto an existing or new Amazon EKS cluster within the customer's AWS account.
+The platform is deployed onto an Amazon EKS cluster in your account, new or
+existing. Both EKS modes are supported, and each has its own values file.
 
-| Requirement | Details | Rationale |
-| :---- | :---- | :---- |
-| Dedicated Nodegroup | A single dedicated nodegroup is required for isolation purposes. | Customer requirement for strict resource isolation. |
-| Instance Type | `m7i.8xlarge` | Specified host type for performance and compatibility. |
-| Minimum Node Count | 2 | Single host deployment as per requirement. |
+| Cluster mode | Values file | Node provisioning |
+|---|---|---|
+| EKS Auto Mode | `aws-auto-mode.values.yaml` | Auto Mode's built-in Karpenter-compatible controller and NodeClass. |
+| EKS standard | `aws-standard.values.yaml` | Your own Karpenter controller; the chart renders an `EC2NodeClass` for it. |
 
-## **Kubernetes Node Pools**
+!!! warning "The chart cannot detect which mode your cluster runs in"
 
-The up-mentioned nodegroup is dedicated for running the auto distillation platform core, but it could, in case preferred, be set as a node pool.
+    Applying the wrong file leaves GPU pods pending indefinitely, because the
+    NodeClass or IAM role Karpenter needs to launch GPU nodes will not exist.
+    Confirm the cluster mode before you choose.
 
-Model training itself will be performed based on the GPU resources using GPU cards variations \- 
+On the standard path the chart also installs the NVIDIA device plugin
+DaemonSet, because plain EC2 nodes do not come with one. Auto Mode installs the
+GPU driver and device plugin itself, so the chart's own DaemonSet stays
+disabled there. Each values file already sets this correctly.
 
-| AWS Instance family | GPU Card | Node Pool Name |
-| :---- | :---- | :---- |
-| g6e | `L40S` | gpu-high-performance |
-| g5 | `A10G` | gpu-basic |
-| g4dn | `T4` | gpu-low-performance |
-| c6i |  | cpu-basic |
+For the platform core, provision a dedicated node group of `m7i.8xlarge` with
+a minimum of two nodes. That is 64 vCPU and 256 GiB against a floor of 26 vCPU
+and 50 GB, which leaves room for rolling upgrades and for the burst of
+short-lived pods the platform creates while a job starts. A dedicated group
+also keeps the platform isolated from your other workloads. GPU capacity is
+separate and is covered below.
 
-GPU Instance won’t be running constantly while the platform is online, but will be running On Demand, as training takes place, therefore, no GPU massive cost is expected.
+## Node pools
 
-## **Networking**
+The chart schedules work onto six named tiers. Each tier is a `workload` label
+value; the chart's node selectors and matching tolerations are already set in
+the values files, so you do not assign these by hand.
 
-The EKS cluster and its nodegroup must have the necessary network configuration for external and internal communication (e.g., access to S3, MSK, DocumentDB, etc.).
+| Node pool | Instance types | Accelerator | Purpose |
+|---|---|---|---|
+| `gpu-high-performance` | `g6e.4xlarge` | NVIDIA L40S | Generative and high-VRAM training. |
+| `gpu-basic` | `g5` family | NVIDIA A10G | Playground inference and general GPU training. |
+| `gpu-low-performance` | `g4dn` family | NVIDIA T4 | Classification and NER training and evaluation. |
+| `cpu-high-performance` | `c6i`, `c6a` families | — | Shares the `cpu-basic` pool. |
+| `cpu-basic` | `c6i`, `c6a` families | — | CPU training, data processing, and evaluation. |
+| `cpu-low-performance` | `c6i`, `c6a` families | — | Shares the `cpu-basic` pool. |
 
-# **AWS Service Requirements**
+The three CPU tiers deliberately map to one pool on AWS; the platform
+distinguishes them so that other clouds can separate them, and so you can
+split them later by overriding the tier's node selector.
 
-The following AWS services and resources are required to support the SpecificAI Inference solution's functionality.
+Karpenter provisions these nodes on demand as jobs are queued and consolidates
+them away five minutes after they go idle, so no GPU node runs continuously
+just because the platform is online.
 
-## **Amazon Simple Storage Service (S3)**
+## Networking
 
-An S3 bucket is necessary for hosting the core inference models used by the solution.
+The chart exposes the platform through a Kubernetes Ingress. You provide the
+ingress controller; the chart does not install one.
 
-* **S3 Bucket:** A dedicated S3 bucket must be created for model hosting.  
-  1.  **This bucket must include a dedicated directory for the models to be served (called deployed\_models), as the inference solution uses this as the repository path for serving models.**  
-  2. **The bucket should enable CORS (required for upload and download large files from the platform, using sign-url), with the following configuration**
+| Helm value | Meaning |
+|---|---|
+| `global.optuneAddress` | The hostname the platform is served on. Used as the Ingress host and as the base of the single sign-on redirect URI. |
+| `global.ingress.createIngress` | Whether the chart renders the Ingress. Default `true`. |
+| `global.ingress.className` | The `ingressClassName` on the rendered Ingress. Default `nginx`. |
 
-```
-# CORS on models bucket
+Create a DNS record for `global.optuneAddress` pointing at your ingress
+controller's load balancer. Use a CNAME to the load balancer's DNS name rather
+than an A record to a resolved address, which changes.
+
+**TLS is terminated in front of the cluster on AWS.** The Ingress the chart
+renders on AWS carries no `tls` block, so bring your own certificate — an ACM
+certificate on the load balancer is the usual arrangement. The chart's
+`global.ingress.createCertificateSecret` path is Azure-only and does nothing
+here.
+
+The cluster needs outbound connectivity to the S3 bucket, to the database,
+to the registry the platform images are pulled from, and to the small set of
+third-party endpoints listed under **Outbound endpoints** below. Gateway API
+is not used on AWS; leave `global.gateway.enabled` at `false`.
+
+## Cloud services
+
+### Object storage
+
+One dedicated S3 bucket holds datasets, checkpoints, and trained model
+artifacts. Set it on `global.bucketName` and on `backend.storage.s3.bucketName`,
+with the region on `backend.storage.s3.region`.
+
+The bucket must contain a `deployed_models/` prefix. The Triton inference
+server uses it as its model repository path and will not start without it.
+
+Enable CORS on the bucket. The platform uploads and downloads large files
+directly from the browser using pre-signed URLs, which fail without it.
+
+```terraform
 cors_rule {
   allowed_headers = ["*"]
   allowed_methods = ["PUT"]
-  allowed_origins = [<frontend_url_or_https_domain>]
+  allowed_origins = ["https://<your platform hostname>"]
   expose_headers  = ["ETag", "Content-Type"]
   max_age_seconds = 3000
 }
 ```
 
-     **C. The bucket should include the following lifecycle rule**
+Add a lifecycle rule so temporary download artifacts do not accumulate.
 
-```
-# Lifecycle cleanup for temporary downloads
+```terraform
 rule {
   id     = "expire-downloads"
   status = "Enabled"
@@ -82,11 +142,11 @@ rule {
 }
 ```
 
-* **Access Policy:** The EKS Worker Node IAM Role or the Kubernetes Service Account (via IAM Roles for Service Accounts \- IRSA) must have the following permissions \-
+Grant access with IAM Roles for Service Accounts and pass the role ARN as
+`global.roleId`; the EKS worker node role works as a fallback. These are the
+only S3 actions the platform performs, so the policy can stop here.
 
-
-```
-# Required S3 actions for upload/download flow
+```terraform
 actions = [
   "s3:GetObject",
   "s3:PutObject",
@@ -94,66 +154,57 @@ actions = [
   "s3:AbortMultipartUpload",
   "s3:ListMultipartUploadParts"
 ]
-resources = ["arn:aws:s3:::specificai-*/*"]
+resources = ["arn:aws:s3:::<your-bucket>/*"]
 
 actions   = ["s3:ListBucket"]
-resources = ["arn:aws:s3:::specificai-*"]
+resources = ["arn:aws:s3:::<your-bucket>"]
 ```
 
-## **MongoDB (AWS DocumentDB/MongoDBAtlas)**
+### Database
 
-The platform persistent data is stored based on MongoDB Compatible solution, either DocumentDB or MongoDBAtlas
+The platform stores its operational data in a MongoDB-compatible database.
+Either option below works; pick on your own operational preference.
 
-Hereby, this is the recommended compute solution to serve the platform \- 
-
-| Solution | Compute size/tier |
-| :---- | :---- |
+| Service | Recommended tier |
+|---|---|
 | MongoDB Atlas | `M40` |
-| AWS DocumentDB | `db.r5.xlarge` |
+| Amazon DocumentDB | `db.r5.xlarge` |
 
-# **Deployment Requirements**
+A smaller tier is workable for a proof of concept, with a migration planned
+before production use. Supply the connection string as the
+`DB_CONNECTION_STRING` key described under **Secrets**.
 
-The deployment process relies on specific tooling and authentication methods.
+### Message broker
 
-## **Helm**
+**No managed message broker is required.** The platform runs RabbitMQ inside
+the cluster by default, installed and managed by the Helm chart, and the AWS
+values files leave it that way. You do not need to provision Amazon MSK.
 
-The SpecificAI Inference solution is distributed as a Helm chart.
+If you would rather run a managed broker, the platform also speaks Kafka. Set
+`common.env.data.MESSAGE_BROKER_TYPE` to `kafka`, point
+`common.env.data.KAFKA_BOOTSTRAP_SERVERS` at your MSK cluster, and supply the
+`KAFKA_PASSWORD` key described under **Secrets**. On MSK the defaults
+`KAFKA_SASL_MECHANISM: SCRAM-SHA-512`, `KAFKA_SECURITY_PROTOCOL: SASL_SSL`, and
+`KAFKA_ENV: cloud` are already correct. Only one broker is active at a time.
 
-* **Helm Installation:** Helm must be installed on the deployment environment.  
-* **AWS Credentials for Helm:** The Helm installation process requires trust policy or as fallback a valid pair of AWS credentials (Access Key ID and Secret Access Key) to facilitate any required AWS interactions during the chart deployment (e.g., dynamic resource creation, integration with cloud services).
+--8<-- "_snippets/secrets.md"
 
-	The credentials will be given by SpecificAI DevOps
+--8<-- "_snippets/outbound-endpoints.md"
 
-* **Helm Chart OCI: 709825985650.dkr.ecr.us-east-1.amazonaws.com/specific-ai/specificai-platform:X.X.X**
+## Next steps
 
-### Secrets
+Once the cluster, the bucket, and the database exist, choose the values file
+that matches your cluster mode — `aws-auto-mode.values.yaml` or
+`aws-standard.values.yaml` — and fill in the placeholders it marks.
 
-The platform relies on secret for several cases, such as SSO configuration, services authentication (Kafka, MongoDB), SSL configuration, etc.
+The platform chart is distributed through the AWS Marketplace container
+registry as
+`709825985650.dkr.ecr.us-east-1.amazonaws.com/specific-ai/specificai-platform`.
+Access is granted to your AWS account when your subscription is set up; send
+SpecificAI DevOps your AWS account ID to have it enabled. The
+[registry access page](../registry-access.md) describes the exchange.
 
-SpecificAI helm chart support injecting such values using its values file. However, the customer may like to create the secrets on his own, skipping secrets creation by the chart installation.
-
-Here are the list of secrets and expected keys
-
-| Secret Name | Key | Purpose |
-| :---- | :---- | :---- |
-| docker-ro-creds | .dockerconfigjson | DockerHub credentials for pulling the platform images from SpecificAI private DockerHub Registry.<br><br>This secret will be provided by SpecificAI Devops prior the installation.<br><br>This secret is set as deployments \- imagePullSecrets |
-| specificai-secrets | DB\_CONNECTION\_STRING KAFKA\_PASSWORD | Used by the pod to authenticate third parties such as Kafka and MongoDB.<br><br>Both should contain valid connectionString. |
-| specificai-auth-secrets | WEB\_APP\_GOOGLE\_CLIENT\_ID WEB\_APP\_GOOGLE\_CLIENT\_SECRET WEB\_APP\_GOOGLE\_REDEIRECT\_URI | This configuration is required for setting up SSO configuration based on Azure Web App registration. ([docs](https://learn.microsoft.com/en-us/entra/identity-platform/quickstart-register-app)) |
-| coralogix-keys | PRIVATE\_KEY | SpecificAI helm chart contains with installation of coralogix opentelemetry agent. Therefore, private api key is required to report metadata logs to SpecificAI. |
-
-## 
-
-### Egresses
-
-SpecificAI platform uses third parties applications to ensure proper functionality. Hence, in order to track how the platform takes place, we used the following providers:
-
-*Note*  
-Any data sent by our platform to any third party is metadata only. No PII or any sensitive data will be reported, and will remain as a private asset hosted on your end.
-
-| Provider | Endpoint | Purpose |
-| :---- | :---- | :---- |
-| Coralogix | eu2.coralogix.com | Logs monitoring. |
-| Weights & Biases | api.wandb.ai | Model Training metrics and insights. |
-| FullStory | \*.fullstory.com | Browser session recorder.<br><br>Following the previous note, sensitive data is masked hence won’t be delivered either to fullstory or SpecificAI. |
-
-[image1]: assets/specificai-logo.png
+Then follow the [install guide](../install.md) to log in to the registry,
+install the chart with your values file, and verify the deployment. The chart
+version you install determines the platform version; see the changelog for
+what each release contains.

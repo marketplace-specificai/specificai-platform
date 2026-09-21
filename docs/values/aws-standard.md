@@ -1,3 +1,11 @@
+# Amazon EKS with self-managed Karpenter values
+
+`aws-standard.values.yaml` targets **Amazon EKS with self-managed Karpenter** clusters. Download the raw file
+from [`values/aws-standard.values.yaml`](https://github.com/marketplace-specificai/specificai-platform/blob/main/values/aws-standard.values.yaml),
+fill in the `<PLACEHOLDER>` values it marks, and pass it to
+`helm upgrade --install` as described in the [install guide](../install.md).
+
+```yaml
 # DO NOT EDIT in the public repository. This file is generated from
 # SpecificAI's private chart sources by
 # tools/marketplace_mirror/transform_content.py and republished on every
@@ -5,22 +13,23 @@
 # the copy under your own version control.
 
 # ==============================================================================
-# Cluster type: AWS EKS — Auto Mode
+# Cluster type: AWS EKS — Standard (self-managed Karpenter)
 # ==============================================================================
-# WARNING: This file is for EKS Auto Mode ONLY. Helm has no way to detect which
-# mode your cluster actually runs in. Applying this file to a self-managed-
-# Karpenter EKS cluster (or applying aws-standard.values.yaml to an Auto Mode
-# cluster) can leave GPU pods pending indefinitely, because the NodeClass your
-# cluster needs to provision GPU nodes will not exist. Use
-# aws-standard.values.yaml instead if you run your own Karpenter controller.
+# WARNING: This file is for a standard EKS cluster running your OWN Karpenter
+# controller ONLY. Helm has no way to detect which mode your cluster actually
+# runs in. Applying this file to an EKS Auto Mode cluster (or applying
+# aws-auto-mode.values.yaml here) can leave GPU pods pending indefinitely,
+# because the EC2NodeClass / IAM role Karpenter needs to provision GPU nodes
+# will not exist. Use aws-auto-mode.values.yaml instead if your cluster runs
+# EKS Auto Mode.
 # ==============================================================================
 #
-# EKS Auto Mode ships a built-in Karpenter-compatible controller and a default
-# NodeClass, so the chart does not need to render an EC2NodeClass (or the IAM
-# role / discovery tags that come with it) — it only renders NodePools that
-# point at Auto Mode's own NodeClass. Auto Mode also installs the NVIDIA GPU
-# driver and device plugin on GPU nodes itself, so the chart's own device
-# plugin DaemonSet must stay disabled.
+# On self-managed Karpenter, the chart renders an EC2NodeClass (in addition to
+# the NodePools) so Karpenter knows which AMI, subnets and security groups to
+# launch nodes with — this needs the node IAM role and a discovery tag your
+# subnets/security groups carry. Because these are plain EC2 nodes (not an
+# Auto Mode-managed fleet), the platform must also install the NVIDIA device
+# plugin DaemonSet itself.
 
 global:
   cloudProvider: "aws"
@@ -34,10 +43,9 @@ global:
   optuneAddress: "<YOUR_PLATFORM_HOSTNAME>" # e.g. specificai.yourcompany.com
 
   # Node selectors the chart's own NodePools (rendered below) label their
-  # nodes with, regardless of Auto Mode vs self-managed Karpenter — job-runner
-  # stamps these onto training/evaluation/image-build Jobs. Leaving these unset
-  # on AWS reaches job-runner as an empty selector and the Job is silently
-  # never created, so they must be set explicitly (no chart-side default here).
+  # nodes with. Leaving these unset on AWS reaches job-runner as an empty
+  # selector and the Job is silently never created, so they must be set
+  # explicitly (no chart-side default here, unlike GCP).
   cpuHighPerformanceNodeSelector:
     workload: "cpu-basic"
   cpuBasicNodeSelector:
@@ -94,18 +102,25 @@ backend:
 
 common:
   karpenter:
-    # Render the chart's NodePools (see charts/common/templates/nodepool.yaml).
+    # Render the chart's NodePools AND EC2NodeClass (see
+    # charts/common/templates/nodepool.yaml + nodeclasses.yaml).
     createNodePools: true
-    # Auto Mode: skip EC2NodeClass and point NodePools at Auto Mode's built-in
-    # default NodeClass. Do NOT set karpenter.roleArn / karpenter.discoveryTag
-    # in this mode — they are only read on the self-managed path.
-    mode: "auto-mode"
+    # Self-managed: chart renders EC2NodeClass for your own Karpenter
+    # controller to use. This is the default, set explicitly for clarity.
+    mode: "self-managed"
+    # IAM role ARN the rendered EC2NodeClass uses to launch/bootstrap nodes
+    # (the Karpenter "node role", NOT the platform's own IRSA role above).
+    roleArn: "<YOUR_KARPENTER_NODE_ROLE_ARN>" # arn:aws:iam::<account-id>:role/<your-karpenter-node-role>
+    # Tag value Karpenter uses to discover which subnets/security groups it
+    # may use (subnetSelectorTerms / securityGroupSelectorTerms match on the
+    # "karpenter.sh/discovery" tag key with this value).
+    discoveryTag: "<YOUR_KARPENTER_DISCOVERY_TAG_VALUE>"
 
-  # Auto Mode installs the NVIDIA driver and device plugin on GPU nodes
-  # itself — leave the chart's own DaemonSet disabled to avoid double-managing
-  # the same device.
+  # Plain EC2 nodes launched by your own Karpenter controller do not come with
+  # a GPU device plugin preinstalled — the chart must deploy its own
+  # DaemonSet so the kubelet exposes nvidia.com/gpu on GPU nodes.
   nvidiaDevicePlugin:
-    enabled: false
+    enabled: true
 
 # Triton reads deployed models straight from object storage. The umbrella chart
 # blanks this value, so it has to be set per cloud: without it the model
@@ -113,3 +128,4 @@ common:
 # Triton fails to start.
 specificai-inference:
   storageProvider: "s3"
+```

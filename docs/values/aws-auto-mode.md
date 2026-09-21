@@ -1,3 +1,11 @@
+# Amazon EKS Auto Mode values
+
+`aws-auto-mode.values.yaml` targets **Amazon EKS Auto Mode** clusters. Download the raw file
+from [`values/aws-auto-mode.values.yaml`](https://github.com/marketplace-specificai/specificai-platform/blob/main/values/aws-auto-mode.values.yaml),
+fill in the `<PLACEHOLDER>` values it marks, and pass it to
+`helm upgrade --install` as described in the [install guide](../install.md).
+
+```yaml
 # DO NOT EDIT in the public repository. This file is generated from
 # SpecificAI's private chart sources by
 # tools/marketplace_mirror/transform_content.py and republished on every
@@ -113,3 +121,4 @@ common:
 # Triton fails to start.
 specificai-inference:
   storageProvider: "s3"
+```

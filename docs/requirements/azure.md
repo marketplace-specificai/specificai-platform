@@ -1,160 +1,232 @@
-## SpecificAI Platform Requirements Note
+# SpecificAI Platform — Azure requirements
 
-### Intro
+SpecificAI Platform is a self-hosted, Kubernetes-native application for
+creating task-specific models. It runs entirely inside your own Azure
+subscription: your datasets, your trained models, and your inference traffic
+never leave it.
 
-SpecificAI Platform is a self-hosted kubernetes native application for creating task-specific models.  
-SpecificAI is meant to be running on a cloud provider environment, such as Azure and AWS.
+This page lists the Azure infrastructure to provision before installing the
+platform Helm chart — the cluster, the node pools, the networking, and the
+managed services the platform connects to. Provision what is described here,
+then install the chart with the values file that matches your cluster.
 
-The following services are required to be set prior of SpecificAI Platform installation:
+Everything on this page is customer-owned. SpecificAI supplies the container
+images, the Helm chart, and updates; you operate the infrastructure they run
+on.
 
-* Storage  
-  * AWS: S3 Bucket  
-  * Azure: Storage Account with blob container  
-* Kafka  
-  * AWS: MSK  
-  * Azure: Eventhub Namespace  
-* MongoDB Compatible database cluster  
-  * AWS: DocumentDB  
-  * Azure: CosmosDB  
-  * MongoDBAtlas  
-* Kubernetes  
-  * AWS: EKS  
-  * Azure: AKS
+## Platform compute floor
 
-Here’s the breakdown of each of the above services recommended configurations for Azure Cloud services.
+The platform core must have this much capacity schedulable at all times.
 
-### 
+| Resource | Floor |
+|---|---|
+| vCPU | 26 |
+| Memory | 50 GB |
 
-### Azure Cloud Services
+The floor covers the always-on platform services only. It excludes GPU
+capacity and anything running outside the cluster. Training, evaluation, and
+Playground inference run on GPU nodes that are provisioned on demand and
+released when the work finishes, so GPU capacity is not part of the standing
+footprint and is not billed while the platform is idle.
 
-#### Storage (Blob container)
+## Managed Kubernetes cluster
 
-SpecificAI Platform requires of a dedicated blob container included with a dedicated directory named `deployed_models`
+The platform is deployed onto an Azure Kubernetes Service cluster in your
+subscription, new or existing. Both AKS modes are supported, and each has its
+own values file.
 
-Motivation: While inferring models, Triton server (installed as part of SpecificAI Helm solution) will set this directory as its repository-path.
+| Cluster mode | Values file | Node provisioning |
+|---|---|---|
+| AKS Automatic | `azure-automatic.values.yaml` | Built-in node auto-provisioning reconciles the `NodePool` and `AKSNodeClass` the chart renders. |
+| AKS Standard | `azure-standard.values.yaml` | Node pools you create ahead of time, labeled `workload: <tier>`. |
 
-**Authentication: Workload Identity, no storage account key.** From chart **4.5.0** the platform reaches the blob container only through the federated managed identities described under *Azure federated identity* below. The Helm chart mounts the container with the Azure Blob CSI driver using a Workload Identity token (`mountWithWorkloadIdentityToken`), and both the backend and the Triton inference server read it as a normal filesystem path. **No storage account key is requested, stored, or rendered into a Kubernetes Secret**, so the storage account may keep **shared key access disabled**.
+!!! warning "The chart cannot detect which mode your cluster runs in"
 
-The **platform (backend) identity** needs **Storage Blob Data Contributor** on the storage account (or its resource group) because its mount is read-write; a **dedicated read-only inference identity** needs only **Storage Blob Data Reader**. The container must be reachable from the AKS node subnet.
+    Applying the wrong file leaves GPU pods pending indefinitely, because the
+    node auto-provisioning controller the rendered `NodePool` needs — or the
+    pre-built pool the node selectors point at — will not exist. Confirm the
+    cluster mode before you choose.
 
-Values to supply at install time:
+On the standard path the chart also installs the NVIDIA device plugin
+DaemonSet, because pre-built pools have no provisioning layer installing GPU
+drivers on your behalf. On AKS Automatic, auto-provisioned GPU nodes come with
+the driver and device plugin preinstalled, so the chart's own DaemonSet stays
+disabled there. Each values file already sets this correctly.
+
+For the platform core, provision a dedicated node pool of `Standard_D16ds_v5`
+with a minimum of two nodes and a 100 GB OS disk. That is 32 vCPU and 128 GiB
+against a floor of 26 vCPU and 50 GB, which leaves room for rolling upgrades
+and for the burst of short-lived pods the platform creates while a job starts.
+A dedicated pool also keeps the platform isolated from your other workloads.
+Use on-demand capacity; spot is workable only if an eviction during working
+hours is acceptable to you. GPU capacity is separate and is covered below.
+
+The cluster also needs Workload Identity and the OIDC issuer enabled — object
+storage authentication depends on both, as described under **Cloud services**.
+
+## Node pools
+
+The chart schedules work onto six named tiers. Each tier is a `workload` label
+value; the chart's node selectors and matching tolerations are already set in
+the values files, so you do not assign these by hand.
+
+| Node pool | Instance type | Accelerator | Purpose |
+|---|---|---|---|
+| `gpu-high-performance` | Any L40S SKU | NVIDIA L40S | Generative and high-VRAM training. |
+| `gpu-basic` | `Standard_NV6ads_A10_v5` up to `Standard_NV36ads_A10_v5` | NVIDIA A10 | Playground inference and general GPU training. |
+| `gpu-low-performance` | T4 SKUs, e.g. `Standard_NC8as_T4_v3` | NVIDIA T4 | Classification and NER training and evaluation. |
+| `cpu-high-performance` | `D` family | — | Shares the `cpu-basic` pool. |
+| `cpu-basic` | `D` family | — | CPU training, data processing, and evaluation. |
+| `cpu-low-performance` | `D` family | — | Shares the `cpu-basic` pool. |
+
+The three CPU tiers deliberately map to one pool on Azure; the platform
+distinguishes them so that other clouds can separate them, and so you can
+split them later by overriding the tier's node selector.
+
+On AKS Automatic, node auto-provisioning launches these nodes on demand as
+jobs are queued and consolidates them away five minutes after they go idle, so
+no GPU node runs continuously just because the platform is online. The values
+file pins which VM SKUs each GPU tier may use through the
+`karpenter.azure.com/sku-name` node selectors and the matching
+`common.karpenter.azure` SKU lists; adjust both together to match the quota in
+your subscription.
+
+On AKS Standard, create the pools ahead of time — `az aks nodepool add
+--labels workload=<tier>`, Terraform, or the portal — and keep the labels
+aligned with the node selectors in the values file. Pools you did not label
+can be selected by their AKS agent-pool name instead; the values file shows
+the alternative.
+
+## Networking
+
+The chart exposes the platform through a Kubernetes Ingress. You provide the
+ingress controller; the chart does not install one.
 
 | Helm value | Meaning |
-| :---- | :---- |
+|---|---|
+| `global.optuneAddress` | The hostname the platform is served on. Used as the Ingress host and as the base of the single sign-on redirect URI. |
+| `global.ingress.createIngress` | Whether the chart renders the Ingress. Default `true`. |
+| `global.ingress.className` | The `ingressClassName` on the rendered Ingress. Default `nginx`. |
+
+Create a DNS record for `global.optuneAddress` pointing at your ingress
+controller's public IP. Reserve a static public IP for the controller so the
+record does not go stale when the load balancer is recreated.
+
+**TLS is terminated at the Ingress on Azure.** Either reference an existing
+Kubernetes TLS Secret with `global.ingress.certificateSecretName`, or let the
+chart create it: set `global.ingress.createCertificateSecret` to `true` and
+pass your PEM certificate and key as `global.ingress.certificateTLSCrt` and
+`global.ingress.certificateTLSKey`.
+
+The cluster needs outbound connectivity to the storage account, to the
+database, to the registry the platform images are pulled from, and to the
+small set of third-party endpoints listed under **Outbound endpoints** below.
+Gateway API is not used on Azure; leave `global.gateway.enabled` at `false`.
+
+## Cloud services
+
+### Object storage
+
+One dedicated blob container in a dedicated storage account holds datasets,
+checkpoints, and trained model artifacts.
+
+| Helm value | Meaning |
+|---|---|
+| `global.bucketName` | The storage account and container as `<account>/<container>`. |
 | `backend.storage.blob.accountName` | Storage account name. |
 | `backend.storage.blob.containerName` | Blob container name. |
-| `backend.storage.blob.resourceGroup` | Resource group **of the storage account** — **not** the AKS node resource group (`MC_*`). Required; the CSI driver uses it to resolve the account when mounting with a token. |
-| `global.roleId` | Client ID (UUID) of the user-assigned managed identity federated with the platform service account. This is the identity the **backend** models volume mounts as. |
-| `specificai-inference.serviceAccount.roleId` | Client ID of the identity federated with the **Triton inference** service account, when that component runs under its own service account. This is the identity the **Triton** models volume mounts as. Leave unset to reuse `global.roleId`. |
+| `backend.storage.blob.resourceGroup` | Resource group of the storage account — not the AKS `MC_*` node resource group. |
+| `global.roleId` | Client ID of the user-assigned managed identity the platform's service account federates with. |
+| `specificai-inference.serviceAccount.roleId` | Client ID of a dedicated read-only identity for the Triton inference service account. Leave unset to reuse `global.roleId`. |
 
-Each blob mount presents its PV's client ID together with the **mounting pod's own** service-account token, so every identity above needs a federated credential whose **subject is that exact service account** (`system:serviceaccount:<namespace>:<service-account>`). A mismatch fails the mount with `AADSTS700213: No matching federated identity record found for presented assertion subject ...`. **Read-only mounts need only `Storage Blob Data Reader`**; the read-write backend mount needs `Storage Blob Data Contributor`.
+The container must contain a `deployed_models/` prefix. The Triton inference
+server uses it as its model repository path and will not start without it; the
+values file already points the inference mount
+(`specificai-inference.models.blob`) at the same container.
 
-A legacy account-key mode (`global.azure.useWorkloadIdentityForBlob: false`) is retained for **one release** so existing installs can upgrade before switching. It requires a storage account key and shared key access enabled, and will be removed.
+Enable CORS on the storage account's blob service, allowing `PUT` from
+`https://<your platform hostname>` with the `ETag` and `Content-Type` headers
+exposed. The platform uploads and downloads large files directly from the
+browser using pre-signed URLs, which fail without it. Add a lifecycle
+management rule that deletes blobs under the `downloads/` prefix after one
+day, so temporary download artifacts do not accumulate.
 
-#### Models volume (Playground catalog)
+**Authentication is Workload Identity — no storage account key.** The chart
+mounts the container with the Azure Blob CSI driver using a Workload Identity
+token, and both the backend and the Triton inference server read it as a
+normal filesystem path. The storage account may keep shared key access
+disabled. Grant the backend identity **Storage Blob Data Contributor** on the
+storage account; a dedicated inference identity needs only **Storage Blob Data
+Reader**, because its mount is read-only.
 
-Playground lists SpecificAI fine-tuned models from the **models blob/container CSI mount** on the **backend** pod (the same container used for trained artifacts). That mount must be readable by the backend process user (**uid 1000**).
+Each identity above needs a federated credential whose subject is the exact
+Kubernetes service account that mounts as it
+(`system:serviceaccount:<namespace>:<service-account>`). A mismatch fails the
+mount with `AADSTS700213: No matching federated identity record found for
+presented assertion subject`. The chart sets blobfuse's `allow_other` mount
+option on the backend models volume so the backend process (uid 1000) can
+read it; keep an equivalent option if you manage that PersistentVolume
+yourself.
 
-Azure Blob CSI / blobfuse mounts as root by default. Set blobfuse **`-o allow_other`** on the backend models PersistentVolume (or StorageClass `mountOptions`). Without it, the backend cannot list the volume and Playground shows no SpecificAI model — even when training completed and the LoRA exists in the container.
+### Database
 
-The SpecificAI Helm chart sets this option on the backend models PV. If you manage the volume yourself, keep `allow_other` (or an equivalent that grants uid 1000 read/list access). After a change, remount the backend pods so the new options take effect.
+The platform stores its operational data in a MongoDB-compatible database.
+Either option below works; pick on your own operational preference.
 
-After the mount is readable, Playground shows **trained versions** (for example V1.0). Recalculate-evaluation minor versions (for example 1.01) are evaluation-only and do not appear as a new Playground model.
+| Service | Recommended tier |
+|---|---|
+| MongoDB Atlas | `M40` |
+| Azure Cosmos DB for MongoDB | Sized comparably to Atlas `M40` |
 
-Then click **Start GPU** to serve the trained model.
+A smaller tier is workable for a proof of concept, with a migration planned
+before production use. Supply the connection string as the
+`DB_CONNECTION_STRING` key described under **Secrets**.
 
-#### Kafka (Eventhub Namespace)
+### Message broker
 
-SpecificAI Platform requires a dedicated eventhub namespace. The platform will create the topics (referred as EventHubs) dynamically.
+**No managed message broker is required.** The platform runs RabbitMQ inside
+the cluster by default, installed and managed by the Helm chart, and the Azure
+values files leave it that way. You do not need to provision Azure Event Hubs.
 
-* SKU: Premium (Required for multiple hubs per namespace; [docs](https://learn.microsoft.com/en-us/azure/event-hubs/compare-tiers#:~:text=50%20per%20CU\)-,Number%20of%20event%20hubs%20per%20namespace,-10))  
-* Capacity: 1  
-* Authorization rule: Send, Listen  
-* Authorization rule SAS \- Will be used by the platform components for authentication (connectionString).
+If you would rather run a managed broker, the platform also speaks Kafka
+through Event Hubs. Provision a dedicated Event Hubs namespace on the
+**Premium** SKU — the platform creates topics dynamically, and lower tiers cap
+the number of event hubs per namespace — with a shared access policy granting
+**Send** and **Listen**. Then set `common.env.data.MESSAGE_BROKER_TYPE` to
+`kafka`, point `common.env.data.KAFKA_BOOTSTRAP_SERVERS` at the namespace's
+Kafka endpoint, set `KAFKA_ENV: eventhub` and `KAFKA_SASL_MECHANISM: PLAIN`,
+and supply the policy's connection string as the `KAFKA_PASSWORD` key
+described under **Secrets**. Only one broker is active at a time.
 
-#### MongoDB (MongoDBAtlas)
+--8<-- "_snippets/secrets.md"
 
-Due to sizing, we recommend using the M40 MongoDBAtlas tier. The equivalent sizing used by AWS is [r5.xlarge](https://instances.vantage.sh/aws/ec2/r5.xlarge?currency=USD).  
-In case of deciding to start with a lower tier, we could set it so as a platform POC step, and along the way, determine a migration plan.
+### Blob storage needs no secret on Azure
 
-#### Kubernetes cluster (AKS)  The platform total resource allocation comes to 26 cores and 50GB of RAM. Therefore our official recommendation is as follows:
+Object storage is deliberately absent from the table above. The platform
+authenticates to the storage account through the federated managed identities
+described under **Cloud services**, so there is no storage account key to
+create, store, or rotate. A legacy account-key mode
+(`global.azure.useWorkloadIdentityForBlob: false`) is retained for one release
+so existing installs can upgrade before switching; it requires shared key
+access enabled on the storage account and will be removed.
 
-Node Pool: Optune \- Main Platform
+--8<-- "_snippets/outbound-endpoints.md"
 
-* Purpose: Running the platform core components.  
-* Num of nodes: (min) 2  
-* Suggested VM type: Standard\_D16ds\_v5  
-* Node Storage size: 100GB  
-* Provisioning type: On-Demand\*  
-  \*Spot instances may be also considerable, as long as it won’t affect the platform availability during working time.
+## Next steps
 
-Node Pool: gpu-basic (Playground inference)
+Once the cluster, the storage account, and the database exist, choose the
+values file that matches your cluster mode — `azure-automatic.values.yaml` or
+`azure-standard.values.yaml` — and fill in the placeholders it marks.
 
-* Purpose: Summarization / generative Playground vLLM (full 24 GB A10, matches AWS g5.2xlarge).  
-* SKU: `Standard_NV36ads_A10_v5`  
-* Karpenter label: `workload: gpu-basic`
+The platform chart is distributed through the AWS Marketplace container
+registry as
+`709825985650.dkr.ecr.us-east-1.amazonaws.com/specific-ai/specificai-platform`.
+The registry is an Amazon ECR even when your platform runs on Azure, so
+SpecificAI DevOps issues you an AWS access key ID and secret access key with
+read-only access to pull the chart and images. The
+[registry access page](../registry-access.md) describes the exchange.
 
-Node Pool: gpu-low-performance (class / NER training and evaluation)
-
-* Purpose: Classification and NER GPU training/eval. Cheaper A10 slices or T4 so these jobs are not forced onto NV36.  
-* SKUs: `Standard_NV6ads_A10_v5`, `Standard_NV12ads_A10_v5` (optional `Standard_NV18ads_A10_v5`), plus T4 (`Standard_NC4as_T4_v3` / `NC8as` / `NC16as`)  
-* Karpenter label: `workload: gpu-low-performance`
-
-Node Pool: gpu-high-performance
-
-* Purpose: Generative / high-VRAM training.  
-* SKU GPU Name: L40S
-
-Node Pool: cpu-training & cpu-inference
-
-* Purpose: Fallback for GPU pools in case of quota/budget concerns.  
-* SKU Family: D
-
-AKS required features:
-
-- Auto provisioning feature (such as NAP/Karpenter), in order to apply nodepool manifest.  
-  Alternatively, you may skip node pools creation using helm values configuration.
-
-Azure federated identity:  
-Federated identity is required to bind an Azure identity with kubernetes service account.  
-The identity should be granted with the following roles:
-
-| Role name | Resource Name (Scope) |
-| :---- | :---- |
-| Managed Identity Operator | Resource group |
-| Storage Blob Data Contributor | Resource group / Storage Account |
-| Virtual Machine Contributor | Resource group |
-| Network contributor | Resource group |
-| Azure Event Hubs Data Owner | EventHub Namespace |
-| Contributor | AKS cluster |
-
-### Secrets
-
-The platform relies on secret for several cases, such as SSO configuration, services authentication (Kafka, MongoDB), SSL configuration, etc.
-
-SpecificAI helm chart support injecting such values using its values file. However, the customer may like to create the secrets on his own, skipping secrets creation by the chart installation.
-
-Here are the list of secrets and expected keys.
-
-**Blob storage is not in this list.** Object storage authenticates through the federated managed identity, so there is no storage account name/key secret to create or rotate.
-
-| Secret Name | Keys | Purpose |
-| :---- | :---- | :---- |
-| docker-ro-creds | .dockerconfigjson | DockerHub credentials for pulling the platform images from SpecificAI private DockerHub Registry.<br><br>This secret will be provided by SpecificAI Devops prior the installation.<br><br>This secret is set as deployments \- *imagePullSecrets* |
-| optune-secrets | DB\_CONNECTION\_STRING KAFKA\_PASSWORD | Used by the pod to authenticate third parties such as Kafka and MongoDB.<br><br>Both should contain valid connectionString. |
-| optune-auth-secrets | WEB\_APP\_AZURE\_CLIENT\_ID WEB\_APP\_AZURE\_CLIENT\_SECRET WEB\_APP\_AZURE\_TENANT\_ID WEB\_APP\_AZURE\_REDEIRECT\_URI | This configuration is required for setting up SSO configuration based on Azure Web App registration. ([docs](https://learn.microsoft.com/en-us/entra/identity-platform/quickstart-register-app)) |
-| coralogix-keys | PRIVATE\_KEY | SpecificAI helm chart contains with installation of coralogix opentelemetry agent. Therefore, private api key is required to report metadata logs to SpecificAI. |
-
-### Egresses
-
-SpecificAI platform uses third parties applications to ensure proper functionality. Hence, in order to track how the platform takes place, we used the following providers:
-
-*Note*  
-Any data sent by our platform to any third party is metadata only. No PII or any sensitive data will be reported, and will remain as a private asset hosted on your end.
-
-| Provider | Endpoint | Purpose |
-| :---- | :---- | :---- |
-| Coralogix | eu2.coralogix.com | Logs monitoring. |
-| Weights & Biases | api.wandb.ai | Model Training metrics and insights. |
-| FullStory | \*.fullstory.com | Browser session recorder.<br><br>Following the previous note, sensitive data is masked hence won’t be delivered either to fullstory or SpecificAI. |
-
+Then follow the [install guide](../install.md) to log in to the registry,
+install the chart with your values file, and verify the deployment. The chart
+version you install determines the platform version; see the changelog for
+what each release contains.

@@ -1,3 +1,9 @@
+# DO NOT EDIT in the public repository. This file is generated from
+# SpecificAI's private chart sources by
+# tools/marketplace_mirror/transform_content.py and republished on every
+# chart release. Copy it, fill in the placeholder values it marks, and keep
+# the copy under your own version control.
+
 # ==============================================================================
 # Cluster type: AWS EKS — Standard (self-managed Karpenter)
 # ==============================================================================
