@@ -1,6 +1,15 @@
 # Changelog
 
-## 4.9.0 — 2026-09-22
+## 4.10.0 — 2026-09-22
+
+`infrastructure`
+
+> ⚠️ **Before upgrading, an infrastructure change is required.**
+> AWS Karpenter NodePools no longer apply the Mountpoint-S3 CSI startup taint by default. After upgrade, new nodes will not wait for s3-csi-node to clear `s3.csi.aws.com/agent-not-ready`. To restore the taint after upgrading Mountpoint-S3 CSI to 2.1.0 or later, set `common.karpenter.s3CsiStartupTaint: true`. See the requirements pages for details.
+
+- AWS Karpenter NodePools no longer apply the Mountpoint-S3 CSI startup taint `s3.csi.aws.com/agent-not-ready:NoExecute` by default. The pinned CSI driver (v1.15) never removes that taint, which left workloads Pending. Opt in with `common.karpenter.s3CsiStartupTaint: true` only after upgrading Mountpoint-S3 CSI to 2.1.0 or later. `infrastructure`
+
+## 4.9.0
 
 `summarization` `content-generation` `playground` `infrastructure` `security`
 

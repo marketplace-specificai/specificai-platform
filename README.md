@@ -17,10 +17,10 @@
 
 <!--
   Static shields.io badges only — no external services beyond img.shields.io.
-  The 4.9.0 token is stamped with the released chart
+  The 4.10.0 token is stamped with the released chart
   version by transform_content.py at staging time.
 -->
-[![Chart version](https://img.shields.io/badge/chart-4.9.0-1753ff)](https://marketplace-specificai.github.io/specificai-platform/changelog/)
+[![Chart version](https://img.shields.io/badge/chart-4.10.0-1753ff)](https://marketplace-specificai.github.io/specificai-platform/changelog/)
 [![License](https://img.shields.io/badge/license-Apache--2.0%20%2B%20CC%20BY%204.0-252a5c)](LICENSE)
 [![Documentation](https://img.shields.io/badge/docs-github.io-1753ff)](https://marketplace-specificai.github.io/specificai-platform/)
 

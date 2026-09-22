@@ -2,7 +2,7 @@
 
 The platform's features, the chart version each first shipped in,
 and its cloud availability — generated from the release catalog for
-platform version **4.9.0**.
+platform version **4.10.0**.
 
 **Clouds** reads as follows:
 
