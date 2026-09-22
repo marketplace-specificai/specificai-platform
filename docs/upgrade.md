@@ -107,7 +107,7 @@ target, newest last. The cloud requirements pages
 [GCP](requirements/gcp.md)) describe the infrastructure each note
 refers to.
 
-### 4.9.0 — 2026-09-15
+### 4.9.0 — 2026-09-22
 
 ⚠️ The Playground GPU pod's memory request/limit rises to 40Gi/52Gi so all sleeping vLLM engines' weights fit in RAM, and on AWS the gpu-basic tier promotes g5.2xlarge to g5.4xlarge. Review the GPU tier and node sizes you have provisioned before upgrading.
 

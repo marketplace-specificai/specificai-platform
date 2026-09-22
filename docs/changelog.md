@@ -1,6 +1,6 @@
 # Changelog
 
-## 4.9.0 — 2026-09-15
+## 4.9.0 — 2026-09-22
 
 `summarization` `content-generation` `playground` `infrastructure` `security`
 
