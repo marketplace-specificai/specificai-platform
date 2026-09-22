@@ -1,30 +1,5 @@
 # Changelog
 
-## 4.10.0 — 2026-09-22
-
-`infrastructure`
-
-> ⚠️ **Before upgrading, an infrastructure change is required.**
-> AWS Karpenter NodePools no longer apply the Mountpoint-S3 CSI startup taint by default. After upgrade, new nodes will not wait for s3-csi-node to clear `s3.csi.aws.com/agent-not-ready`. To restore the taint after upgrading Mountpoint-S3 CSI to 2.1.0 or later, set `common.karpenter.s3CsiStartupTaint: true`. See the requirements pages for details.
-
-- AWS Karpenter NodePools no longer apply the Mountpoint-S3 CSI startup taint `s3.csi.aws.com/agent-not-ready:NoExecute` by default. The pinned CSI driver (v1.15) never removes that taint, which left workloads Pending. Opt in with `common.karpenter.s3CsiStartupTaint: true` only after upgrading Mountpoint-S3 CSI to 2.1.0 or later. `infrastructure`
-
-## 4.9.0
-
-`summarization` `content-generation` `playground` `infrastructure` `security`
-
-> ⚠️ **Before upgrading, an infrastructure change is required.**
-> The Playground GPU pod's memory request/limit rises to 40Gi/52Gi so all sleeping vLLM engines' weights fit in RAM, and on AWS the gpu-basic tier promotes g5.2xlarge to g5.4xlarge. Review the GPU tier and node sizes you have provisioned before upgrading. See the requirements pages for details.
-
-- Playground GPU pods now run one vLLM engine per base model a task needs, multiplexed on a single GPU. Idle engines park their weights in host RAM and exactly one is awake at a time, so a task whose trained models span several base models no longer needs a GPU each. LoRA adapters are always served on the base model they were trained on. `playground` `infrastructure`
-- Base model selection for generative tasks (summarization and content generation) is available under Train -> Advanced. The choice persists on the usecase and drives training. `POST /update_selected_base_distilled_model` now requires the Editor or Admin role. `summarization` `content-generation`
-- Capacity change for the Playground GPU pod: the vLLM wrapper moves to `vllm/vllm-openai:v0.28.0`, `specificai-vllm-inference.model.gpuMemoryUtilization` defaults to 0.65 per engine, and the pod's memory request/limit rises to 40Gi/52Gi so every sleeping engine's weights fit in RAM. On AWS the `gpu-basic` tier promotes g5.2xlarge to g5.4xlarge. Review the GPU tier you have provisioned before upgrading. `playground` `infrastructure`
-- New secret `common.secrets.supervisorAdminToken` (`SUPERVISOR_ADMIN_TOKEN`) protects the Playground supervisor's admin endpoints. It is generated on first install when the chart manages the secret; set it yourself if you manage that secret externally. `security` `infrastructure`
-- New optional values `specificai-vllm-inference.models.pvc.s3.bucketName` and `.volumeHandle` let the vLLM models volume share the backend bucket on AWS and pin a unique cluster-scoped Mountpoint-S3 handle. `backend.storage.s3.volumeHandle` is the matching override on the backend side. Leave all three empty for a single-namespace, one-bucket install. `infrastructure`
-- AWS Karpenter node pools now carry the Mountpoint-S3 CSI startup taint, so a new node waits for the S3 CSI driver to register before workloads schedule onto it. `infrastructure`
-- The Playground base model is resolved per task from the model registry rather than from a single `global.vllmBaseModel`. `playground`
-- AWS installs can opt in to serving the platform through the Kubernetes Gateway API (an ALB via the AWS Load Balancer Controller) instead of the nginx Ingress, with `global.gateway.enabled` and the new `global.gateway.aws` block (`scheme`, `targetType`, `idleTimeoutSeconds`, `loadBalancerName`). Installs that do not opt in keep the nginx Ingress; Azure and GCP are unchanged. The upstream Gateway API CRDs (standard channel v1.4.0) are vendored under `crds/`, so a plain `helm install` lands them; in-place CRD upgrades still need `kubectl apply -f crds/`. Still required on the cluster: AWS Load Balancer Controller >= 3.0.0 with an IAM role, a GatewayClass for `gateway.k8s.aws/alb`, and an ACM certificate covering your hostnames — TLS is discovered from ACM, so `global.gateway.tls.secretName` stays empty on AWS. EKS Auto Mode's built-in load balancer controller does not serve Gateway API. `infrastructure`
-
 ## 4.8.2 — 2026-09-16
 
 `classification` `data-preparation`

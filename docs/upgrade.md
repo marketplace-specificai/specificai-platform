@@ -107,14 +107,6 @@ target, newest last. The cloud requirements pages
 [GCP](requirements/gcp.md)) describe the infrastructure each note
 refers to.
 
-### 4.10.0 — 2026-09-22
-
-⚠️ AWS Karpenter NodePools no longer apply the Mountpoint-S3 CSI startup taint by default. After upgrade, new nodes will not wait for s3-csi-node to clear `s3.csi.aws.com/agent-not-ready`. To restore the taint after upgrading Mountpoint-S3 CSI to 2.1.0 or later, set `common.karpenter.s3CsiStartupTaint: true`.
-
-### 4.9.0
-
-⚠️ The Playground GPU pod's memory request/limit rises to 40Gi/52Gi so all sleeping vLLM engines' weights fit in RAM, and on AWS the gpu-basic tier promotes g5.2xlarge to g5.4xlarge. Review the GPU tier and node sizes you have provisioned before upgrading.
-
 ### 4.7.0 — 2026-09-12
 
 ⚠️ Karpenter node expiry and the node termination grace period now match the training and evaluation Jobs' own deadlines (72h on GPU pools, 168h on CPU pools) on AWS and Azure. NodeClaims are immutable, so nodes already running keep the old policy until they are replaced.
