@@ -1,0 +1,16 @@
+{% extends "base.html" %}
+
+{#
+  Announcement bar (mkdocs-material `announce` block). The release version is
+  not known at authoring time: tools/marketplace_mirror/transform_content.py
+  injects `extra.latest_release` (and `extra.latest_release_anchor`, the slug
+  of that version's changelog heading) into the *staged* mkdocs.yml when the
+  public payload is generated, so the bar updates on every release. The
+  private-repo build defines neither key and renders no bar at all — the
+  theme only shows the bar when this block produces non-empty output, hence
+  the strict whitespace control below.
+#}
+{% block announce %}{%- if config.extra.latest_release -%}
+  Latest release: <strong>{{ config.extra.latest_release }}</strong> —
+  <a href="{{ base_url }}/changelog/{% if config.extra.latest_release_anchor %}#{{ config.extra.latest_release_anchor }}{% endif %}">see what's new</a>
+{%- endif -%}{% endblock %}

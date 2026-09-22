@@ -15,6 +15,15 @@
 
 # SpecificAI Platform
 
+<!--
+  Static shields.io badges only — no external services beyond img.shields.io.
+  The 4.9.0 token is stamped with the released chart
+  version by transform_content.py at staging time.
+-->
+[![Chart version](https://img.shields.io/badge/chart-4.9.0-1753ff)](https://marketplace-specificai.github.io/specificai-platform/changelog/)
+[![License](https://img.shields.io/badge/license-Apache--2.0%20%2B%20CC%20BY%204.0-252a5c)](LICENSE)
+[![Documentation](https://img.shields.io/badge/docs-github.io-1753ff)](https://marketplace-specificai.github.io/specificai-platform/)
+
 Customer-facing documentation and Helm values for deploying the SpecificAI
 Platform on your own cloud account.
 
@@ -35,6 +44,9 @@ Hosted docs: <https://marketplace-specificai.github.io/specificai-platform/>
 | [GCP requirements](docs/requirements/gcp.md) | Cloud prerequisites for GKE |
 | [Registry access](docs/registry-access.md) | How chart and image pull access is granted, per cloud |
 | [Install guide](docs/install.md) | Registry login, `helm install`, verification |
+| [Upgrade guide](docs/upgrade.md) | Upgrade procedure, per-version pre-upgrade checklist, rollback |
+| [Feature availability](docs/features.md) | Features by version and cloud (generated per release) |
+| [Support](docs/support.md) | How to reach the SpecificAI team |
 | [Changelog](CHANGELOG.md) | Chart versions from 4.0.0 onward |
 
 ## Helm chart

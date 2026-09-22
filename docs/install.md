@@ -122,7 +122,8 @@ above.
 ## Upgrade and uninstall
 
 Upgrades are the same `helm upgrade --install` command with a newer
-`--version`; review the
+`--version`; the [upgrade guide](upgrade.md) covers the full procedure,
+including the per-version pre-upgrade checklist and rollback. Review the
 [changelog](https://github.com/marketplace-specificai/specificai-platform/blob/main/CHANGELOG.md)
 first.
 

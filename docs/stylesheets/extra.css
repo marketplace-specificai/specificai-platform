@@ -1,0 +1,51 @@
+/*
+ * SpecificAI brand colors for mkdocs-material, extracted from the
+ * specific.ai Elementor site kit (wp-content/uploads/elementor/css):
+ *
+ *   #252A5C  deep navy   — headings / header (sk_color_3/5/9/10)
+ *   #1753FF  vivid blue  — buttons, links, interactive (sk_color_16)
+ *   #F998E7 / #C483FB    — decorative pink/purple accents (unused here;
+ *                          the docs stay restrained)
+ *
+ * mkdocs.yml sets `palette.primary/accent: custom`, which makes the theme
+ * read these variables (see "Custom colors" in the mkdocs-material docs).
+ */
+
+:root > * {
+  --md-primary-fg-color: #252a5c;
+  --md-primary-fg-color--light: #4a508c;
+  --md-primary-fg-color--dark: #1a1e42;
+  --md-accent-fg-color: #1753ff;
+  --md-accent-fg-color--transparent: rgba(23, 83, 255, 0.1);
+}
+
+/* Links in body copy use the brand blue rather than the navy header color. */
+[data-md-color-scheme="default"] {
+  --md-typeset-a-color: #1753ff;
+}
+
+/* On the dark scheme the saturated brand blue sits too dark against the
+ * slate background; lighten it for readable links while keeping the hue. */
+[data-md-color-scheme="slate"] {
+  --md-typeset-a-color: #7a9bff;
+  --md-accent-fg-color: #7a9bff;
+  --md-accent-fg-color--transparent: rgba(122, 155, 255, 0.1);
+}
+
+/* The wordmark logo is wide (whole logotype, not a square mark); give it a
+ * little more room than the default square-icon sizing. */
+.md-header__button.md-logo img {
+  height: 1.2rem;
+  width: auto;
+}
+
+/* Announcement bar: navy like the header, with readable link contrast. */
+.md-banner {
+  background-color: #1a1e42;
+  color: #e4e7ee;
+}
+
+.md-banner a,
+.md-banner a:hover {
+  color: #f998e7;
+}
