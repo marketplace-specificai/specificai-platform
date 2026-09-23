@@ -5,9 +5,9 @@ version: pull the new chart, reconcile your values file against the freshly
 published template, upgrade, and verify — plus a per-version checklist of
 releases that need infrastructure attention before you upgrade.
 
-Upgrades reuse the install-time plumbing: the registry login from the
-[registry access page](registry-access.md) and the values file you keep under
-your own version control (see the [install guide](install.md)).
+Upgrades reuse the files from the [install guide](install.md): your
+values file and your `secrets.values.yaml`. The chart is public on GitHub
+Container Registry, so no login is involved.
 
 ## Check the pre-upgrade checklist
 
@@ -18,25 +18,13 @@ may need action on your side — GPU tier sizing, storage migrations, node-pool
 policy changes. **When you skip versions, every entry between your current
 version and the target applies**, not just the target's.
 
-## Log in to the registry
-
-Same login as the install (arranged on the
-[registry access page](registry-access.md)):
-
-```bash
-aws ecr get-login-password --region us-east-1 \
-  | helm registry login 709825985650.dkr.ecr.us-east-1.amazonaws.com \
-      --username AWS --password-stdin
-```
-
 ## Pull the new chart version
 
-Pull the target version to inspect what you are about to install, and to get
-that version's values templates:
+Pull the target version anonymously to inspect what you are
+about to install, and to get that version's values templates:
 
 ```bash
-helm pull \
-  oci://709825985650.dkr.ecr.us-east-1.amazonaws.com/specific-ai/specificai-platform \
+helm pull oci://ghcr.io/marketplace-specificai/specificai-platform \
   --version <TARGET_VERSION> --untar
 ```
 
@@ -65,10 +53,11 @@ The upgrade is the install command with the new `--version`:
 
 ```bash
 helm upgrade --install specificai \
-  oci://709825985650.dkr.ecr.us-east-1.amazonaws.com/specific-ai/specificai-platform \
+  oci://ghcr.io/marketplace-specificai/specificai-platform \
   --version <TARGET_VERSION> \
   --namespace specificai \
-  --values your-values.yaml
+  --values your-values.yaml \
+  --values secrets.values.yaml
 ```
 
 ## Verify the rollout
@@ -106,6 +95,10 @@ target, newest last. The cloud requirements pages
 ([AWS](requirements/aws.md), [Azure](requirements/azure.md),
 [GCP](requirements/gcp.md)) describe the infrastructure each note
 refers to.
+
+### 4.10.0 — 2026-09-22
+
+⚠️ The Playground GPU pod's memory request/limit rises to 40Gi/52Gi so all sleeping vLLM engines' weights fit in RAM, and on AWS the gpu-basic tier promotes g5.2xlarge to g5.4xlarge. Review the GPU tier and node sizes you have provisioned before upgrading.
 
 ### 4.7.0 — 2026-09-12
 

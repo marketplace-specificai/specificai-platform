@@ -2,7 +2,7 @@
 
 The platform's features, the chart version each first shipped in,
 and its cloud availability — generated from the release catalog for
-platform version **4.10.0**.
+platform version **4.10.2**.
 
 **Clouds** reads as follows:
 
@@ -67,7 +67,7 @@ Since **3.9.1** · Clouds: **All clouds**
 |---|---|---|
 | Playground for encoder models | 3.9.1 | All clouds |
 | Playground for testing generation models | 3.9.1 | All clouds |
-| Playground GPU inference (summarization / vLLM) | 3.9.1 | Partial |
+| Playground GPU inference (summarization / vLLM) | 3.9.1 | All clouds |
 
 ## Inference
 

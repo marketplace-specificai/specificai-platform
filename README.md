@@ -13,19 +13,42 @@
   repository, and only that file.
 -->
 
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="docs/assets/specificai-logo-white.png">
+    <img alt="SpecificAI" src="docs/assets/specificai-logo.png" width="320">
+  </picture>
+</p>
+
 # SpecificAI Platform
 
 <!--
   Static shields.io badges only — no external services beyond img.shields.io.
-  The 4.8.2 token is stamped with the released chart
+  The 4.10.2 token is stamped with the released chart
   version by transform_content.py at staging time.
 -->
-[![Chart version](https://img.shields.io/badge/chart-4.8.2-1753ff)](https://marketplace-specificai.github.io/specificai-platform/changelog/)
+[![Chart version](https://img.shields.io/badge/chart-4.10.2-1753ff)](https://marketplace-specificai.github.io/specificai-platform/changelog/)
+[![GHCR package](https://img.shields.io/badge/GHCR-specificai--platform-1753ff)](https://github.com/orgs/marketplace-specificai/packages/container/package/specificai-platform)
 [![License](https://img.shields.io/badge/license-Apache--2.0%20%2B%20CC%20BY%204.0-252a5c)](LICENSE)
 [![Documentation](https://img.shields.io/badge/docs-github.io-1753ff)](https://marketplace-specificai.github.io/specificai-platform/)
 
 Customer-facing documentation and Helm values for deploying the SpecificAI
 Platform on your own cloud account.
+
+## Quickstart
+
+The Helm chart is public — pull and install it anonymously, no registry
+login:
+
+```bash
+helm pull oci://ghcr.io/marketplace-specificai/specificai-platform --version 4.10.2
+helm upgrade --install specificai oci://ghcr.io/marketplace-specificai/specificai-platform \
+  --version 4.10.2 --namespace specificai --create-namespace --values <your-values-file>.values.yaml
+```
+
+Fill in a values file from [`values/`](values/) first — the
+[install guide](docs/install.md) walks through every command, including the
+image pull credential and upgrades.
 
 This repository is **generated**. A sync bot republishes every file here from
 SpecificAI's private sources on each chart release, which is why pull requests
@@ -42,8 +65,8 @@ Hosted docs: <https://marketplace-specificai.github.io/specificai-platform/>
 | [AWS requirements](docs/requirements/aws.md) | Cloud prerequisites for EKS |
 | [Azure requirements](docs/requirements/azure.md) | Cloud prerequisites for AKS |
 | [GCP requirements](docs/requirements/gcp.md) | Cloud prerequisites for GKE |
-| [Registry access](docs/registry-access.md) | How chart and image pull access is granted, per cloud |
-| [Install guide](docs/install.md) | Registry login, `helm install`, verification |
+| [Registry access](docs/registry-access.md) | The one credential you receive: the Docker token for platform images |
+| [Install guide](docs/install.md) | Pull the chart, fill in values, install, verify, upgrade |
 | [Upgrade guide](docs/upgrade.md) | Upgrade procedure, per-version pre-upgrade checklist, rollback |
 | [Feature availability](docs/features.md) | Features by version and cloud (generated per release) |
 | [Support](docs/support.md) | How to reach the SpecificAI team |
@@ -51,10 +74,14 @@ Hosted docs: <https://marketplace-specificai.github.io/specificai-platform/>
 
 ## Helm chart
 
-The chart and its container images are distributed through the AWS
-Marketplace container registry as
-`709825985650.dkr.ecr.us-east-1.amazonaws.com/specific-ai/specificai-platform`.
-[Registry access](docs/registry-access.md) describes how access is granted.
+The Helm chart is public. It is published to GitHub Container Registry as
+[`oci://ghcr.io/marketplace-specificai/specificai-platform`](https://github.com/marketplace-specificai/specificai-platform/pkgs/container/specificai-platform)
+and pulls anonymously, with no registry login and no cloud credentials.
+
+The platform's container images are not public. They are stored in
+SpecificAI's private Docker registry, and SpecificAI issues you a read-only
+Docker token to pull them — the only credential you need. The
+[install guide](docs/install.md) shows where it goes.
 
 ## Helm values templates
 

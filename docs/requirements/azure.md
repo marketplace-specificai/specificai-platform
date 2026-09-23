@@ -218,15 +218,7 @@ Once the cluster, the storage account, and the database exist, choose the
 values file that matches your cluster mode — `azure-automatic.values.yaml` or
 `azure-standard.values.yaml` — and fill in the placeholders it marks.
 
-The platform chart is distributed through the AWS Marketplace container
-registry as
-`709825985650.dkr.ecr.us-east-1.amazonaws.com/specific-ai/specificai-platform`.
-The registry is an Amazon ECR even when your platform runs on Azure, so
-SpecificAI DevOps issues you an AWS access key ID and secret access key with
-read-only access to pull the chart and images. The
-[registry access page](../registry-access.md) describes the exchange.
-
-Then follow the [install guide](../install.md) to log in to the registry,
-install the chart with your values file, and verify the deployment. The chart
-version you install determines the platform version; see the changelog for
-what each release contains.
+Then follow the [install guide](../install.md) to pull the chart — it is public
+on GitHub Container Registry and needs no credentials — install it with your
+values file and your Docker token, and verify the deployment. The chart version you install determines the platform version;
+see the changelog for what each release contains.

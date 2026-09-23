@@ -10,25 +10,17 @@ chart defaults and can be changed — each row names the value that renames it.
 
 | Secret | Keys | Purpose |
 |---|---|---|
-| `docker-ro-creds` | `.dockerconfigjson` | Registry credentials used as `imagePullSecrets` by every platform workload. Renamed by `global.imagePullSecretsName`.<br><br>See the registry note below — this is not always needed. |
+| `docker-ro-creds` | `.dockerconfigjson` | Registry credentials used as `imagePullSecrets` by every platform workload. Renamed by `global.imagePullSecretsName`.<br><br>Holds the Docker token SpecificAI issues you. See the registry note below. |
 | `specificai-secrets` | `DB_CONNECTION_STRING`<br>`RABBITMQ_PASSWORD`<br>`KAFKA_PASSWORD`<br>`SUPERVISOR_ADMIN_TOKEN`<br>`KAGGLE_API_TOKEN` | Service credentials, mounted into every pod with `envFrom`. Renamed by `global.envFromSecret`.<br><br>Supply `DB_CONNECTION_STRING` and the password for whichever message broker you run. See the key notes below. |
 | `specificai-auth-secret` | Depends on your identity provider | Single sign-on credentials. Renamed by `global.optuneAuthSecretName`. See the table below. |
 | `coralogix-keys` | `PRIVATE_KEY` | Coralogix send-your-data key. The chart installs a Coralogix OpenTelemetry agent that reports platform telemetry to SpecificAI; the key is issued to you by SpecificAI. |
 
 ### Registry credentials
 
-`docker-ro-creds` holds credentials for the registry your platform images are
-pulled from, and which registry that is depends on how you obtained the chart.
-
-The standard distribution pulls images from SpecificAI's Docker Hub
-organization and needs a read-only Docker Hub credential, which SpecificAI
-DevOps issues before installation. The **AWS Marketplace** distribution is
-published with its image references already rewritten to the marketplace
-container registry, and access to that registry is granted to your cloud
-account rather than to a username and password.
-
-Every workload still carries the `imagePullSecrets` reference either way, so
-keep the Secret name configured; only whether it holds a credential changes.
+`docker-ro-creds` holds the read-only Docker token SpecificAI issues you for
+the platform's container images, which are stored in SpecificAI's private
+Docker registry. Every workload references it as its `imagePullSecrets`. The install guide
+shows how to generate it from your username and token. The Helm chart itself is public and needs no credential.
 
 ### Key notes
 

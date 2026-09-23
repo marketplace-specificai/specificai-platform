@@ -216,17 +216,7 @@ Once the cluster, the bucket, and the database exist, choose the values file
 that matches your cluster mode — `gcp-standard.values.yaml` or
 `gcp-autopilot.values.yaml` — and fill in the placeholders it marks.
 
-The platform chart is distributed through the AWS Marketplace container
-registry as
-`709825985650.dkr.ecr.us-east-1.amazonaws.com/specific-ai/specificai-platform`.
-This is not a mistake: SpecificAI distributes the chart from an Amazon ECR for
-every cloud, so installing on GCP requires AWS credentials for the registry
-alone. SpecificAI DevOps issues you an AWS access key ID and secret access key
-with read-only access to pull the chart and images; nothing else in the
-platform touches AWS. The [registry access page](../registry-access.md)
-describes the exchange.
-
-Then follow the [install guide](../install.md) to log in to the registry,
-install the chart with your values file, and verify the deployment. The chart
-version you install determines the platform version; see the changelog for
-what each release contains.
+Then follow the [install guide](../install.md) to pull the chart — it is public
+on GitHub Container Registry and needs no credentials — install it with your
+values file and your Docker token, and verify the deployment. The chart version you install determines the platform version;
+see the changelog for what each release contains.

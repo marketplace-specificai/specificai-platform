@@ -1,80 +1,35 @@
 # SpecificAI Platform — Registry access
 
-The platform Helm chart and its container images are distributed through the
-AWS Marketplace container registry:
+You need exactly one credential from SpecificAI to install the platform: a
+read-only **Docker token** for the platform's container images.
 
-```text
-709825985650.dkr.ecr.us-east-1.amazonaws.com/specific-ai/specificai-platform
-```
+| What | Where it lives | Credential |
+|---|---|---|
+| Helm chart | Public GitHub Container Registry: `oci://ghcr.io/marketplace-specificai/specificai-platform` | None — anonymous pull |
+| Container images | SpecificAI's private Docker registry | The Docker token SpecificAI issues you |
 
-That registry is an Amazon ECR regardless of which cloud your platform runs
-on — AWS, Azure, and GCP installations all pull the same chart from it. What
-changes per cloud is how you get access: AWS customers are granted access at
-the account level, while Azure and GCP customers are issued credentials.
+The same applies on AWS, Azure, and GCP. No cloud-account access, AWS keys,
+or registry login are involved in getting the chart.
 
-This page describes both exchanges — what you send SpecificAI, what you
-receive back, and how to log in with it. Once you can log in, continue with
-the [install guide](install.md).
-
-## AWS customers
-
-Access is granted to your AWS account as a whole, so no credentials change
-hands.
+## Getting your Docker token
 
 | You send | You receive |
 |---|---|
-| Your 12-digit AWS account ID, to `devops@specific.ai` | Confirmation that your account has pull access. |
+| A request for platform access, through your SpecificAI contact or `devops@specific.ai` | A Docker username and a read-only access token, delivered over a secure channel agreed with your contact. |
 
-SpecificAI adds your account ID to the registry policy's `AllowCustomerPull`
-statement. That statement grants exactly three read-only actions —
-`ecr:BatchCheckLayerAvailability`, `ecr:BatchGetImage`, and
-`ecr:GetDownloadUrlForLayer` — so your account can pull the chart and images
-and nothing else.
+The token can only pull the platform's images; it cannot push or read
+anything else.
 
-Once your account is added, any IAM principal in it that is permitted to call
-ECR can authenticate with your own AWS credentials; SpecificAI issues nothing
-further.
+## Using it
 
-## Azure and GCP customers
+The [install guide](install.md#3-add-your-docker-token) turns the username
+and token into the `docker-ro-creds` image pull Secret the chart references
+from every workload. If a pod reports `ImagePullBackOff`, the token is
+missing, mistyped, or revoked.
 
-The registry is an Amazon ECR even when nothing else in your deployment
-touches AWS, so SpecificAI issues you a dedicated AWS access key to
-authenticate against it. Nothing else in the platform uses this key.
+## Rotating or revoking it
 
-| You send | You receive |
-|---|---|
-| A request for registry access, through your SpecificAI contact or `devops@specific.ai` | An AWS access key ID and secret access key with read-only pull access to the registry, delivered over a secure channel agreed with your contact. |
-
-The key is scoped to pulling from this registry and cannot read or change
-anything else. To rotate the key, or to revoke it when it is no longer
-needed, contact `devops@specific.ai`.
-
-## Log in with your access
-
-Logging in requires the AWS CLI and Helm 3.8 or later. Azure and GCP
-customers first make the issued key visible to the AWS CLI:
-
-```bash
-export AWS_ACCESS_KEY_ID=<your issued access key ID>
-export AWS_SECRET_ACCESS_KEY=<your issued secret access key>
-```
-
-AWS customers skip that step and use whatever AWS credentials they normally
-work with.
-
-Then log Helm in to the registry:
-
-```bash
-aws ecr get-login-password --region us-east-1 \
-  | helm registry login 709825985650.dkr.ecr.us-east-1.amazonaws.com \
-      --username AWS --password-stdin
-```
-
-The same password also works for `docker login` with username `AWS`, if you
-want to inspect images directly. ECR authorization tokens expire after
-12 hours; rerun the command to get a fresh one.
-
-If a pull is denied after login, the usual causes are an account ID not yet
-added to the registry policy, or a region other than `us-east-1` in the
-`get-login-password` call. Write to `devops@specific.ai` if access still
-fails.
+To rotate the token, or to revoke it when it is no longer needed, contact
+`devops@specific.ai`. After rotation, regenerate `secrets.values.yaml` with the
+new token as in the install guide and rerun your `helm upgrade --install`
+command.
