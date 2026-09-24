@@ -1,6 +1,6 @@
 # Changelog
 
-## 4.10.2 — 2026-09-23
+## 4.10.2 — 2026-09-24
 
 `playground` `infrastructure`
 

@@ -11,7 +11,8 @@ You need:
 - The infrastructure described on your cloud's requirements page —
   [AWS](requirements/aws.md), [Azure](requirements/azure.md),
   or [GCP](requirements/gcp.md).
-- Helm 3.8 or later and `kubectl` pointed at your cluster.
+- Helm 3.8 or later and `kubectl` pointed at your cluster. On Helm 4, read
+  the CRD note under step 4 before installing.
 - The **Docker username and read-only token** SpecificAI issued you. It is
   the only credential you need — see the [access page](registry-access.md).
 
@@ -70,14 +71,19 @@ identity, platform hostname). Keep your copy under your own version control.
 
 The platform's container images live in SpecificAI's private Docker registry.
 Turn the username and token SpecificAI issued you into the image pull
-credential the chart expects, and write it to a separate secrets file:
+credential the chart expects, and write it to a separate secrets file. The
+token is read from a prompt so it stays out of your shell history:
 
 ```bash
+printf 'Docker username: '; read -r DOCKER_USERNAME
+printf 'Docker token: '; read -r -s DOCKER_TOKEN; echo
+
 DOCKER_CONFIG_JSON=$(kubectl create secret docker-registry docker-ro-creds \
   --docker-server=https://index.docker.io/v1/ \
-  --docker-username=<DOCKER_USERNAME> \
-  --docker-password=<DOCKER_TOKEN> \
+  --docker-username="${DOCKER_USERNAME}" \
+  --docker-password="${DOCKER_TOKEN}" \
   --dry-run=client -o jsonpath='{.data.\.dockerconfigjson}')
+unset DOCKER_TOKEN
 
 cat > secrets.values.yaml <<EOF
 common:
@@ -87,9 +93,25 @@ EOF
 ```
 
 `--dry-run=client` only encodes the credential locally; nothing is sent to
-your cluster yet. Add the other secret values listed under **Secrets** on your
-requirements page (database connection string, broker password, SSO) to the
-same file. Keep `secrets.values.yaml` out of version control.
+your cluster yet.
+
+Add the rest of your secret values to the same file. With the default
+in-cluster broker and an external MongoDB, it ends up like this:
+
+```yaml
+common:
+  secrets:
+    dockerConfigJson: "<generated above>"
+    dbConnectionString: "<MONGODB_CONNECTION_STRING>"
+    rabbitmqPassword: "<BROKER_PASSWORD>"
+rabbitmq:
+  auth:
+    password: "<BROKER_PASSWORD>"   # must equal common.secrets.rabbitmqPassword
+```
+
+Set `common.secrets.kafkaPassword` only if you switch the broker to Kafka. The
+**Secrets** section of your requirements page describes each value and the
+single sign-on keys. Keep `secrets.values.yaml` out of version control.
 
 ## 4. Install
 
@@ -107,6 +129,15 @@ helm upgrade --install specificai \
 The chart runs RabbitMQ inside the cluster by default, so there is no managed
 message broker to provision unless you deliberately switch to Kafka.
 
+!!! warning "Helm 4 on clusters whose provider manages the Gateway API CRDs"
+
+    The chart bundles the Gateway API and KEDA CustomResourceDefinitions.
+    Helm 3 skips CRDs that already exist, but Helm 4 applies them and fails
+    with `failed to install CRD crds/gateway-api-standard-install.yaml:
+    conflict ... "kube-addon-manager"` where the cloud provider owns those
+    CRDs — GKE is one such cluster. Add `--skip-crds` to the install and
+    upgrade commands there; the provider's CRDs are used as they are.
+
 ## 5. Verify
 
 ```bash
@@ -115,13 +146,23 @@ kubectl get pods --namespace specificai
 kubectl get ingress --namespace specificai
 ```
 
+If your values file enables the Gateway API (`global.gateway.enabled: true`)
+instead of an ingress, `kubectl get ingress` returns nothing. Check the
+Gateway and its routes instead; the Gateway is ready when `PROGRAMMED` is
+`True` and `ADDRESS` is set:
+
+```bash
+kubectl get gateway,httproute --namespace specificai
+```
+
 Within a few minutes every pod should be `Running` or `Completed`. GPU nodes
 are provisioned on demand, so seeing no GPU nodes while the platform is idle
 is normal.
 
-Once the ingress has an address, point the DNS record for your platform
-hostname (`global.optuneAddress`) at it, as described in the **Networking**
-section of your requirements page, then open `https://<your platform hostname>`.
+Once the ingress or Gateway has an address, point the DNS record for your
+platform hostname (`global.optuneAddress`) at it, as described in the
+**Networking** section of your requirements page, then open
+`https://<your platform hostname>`.
 
 If a pod reports `ImagePullBackOff`, the Docker token is missing or wrong —
 recheck step 3. If a training or inference pod stays `Pending` and no GPU node
@@ -132,7 +173,8 @@ appears, the values file does not match the cluster mode — recheck step 2.
 Review the
 [changelog](https://github.com/marketplace-specificai/specificai-platform/blob/main/CHANGELOG.md)
 and the [upgrade guide](upgrade.md) first. Then run the same command with the
-new version and the same two values files:
+new version and the same two values files (plus `--skip-crds` if you needed
+it for the install):
 
 ```bash
 helm upgrade --install specificai \
@@ -148,9 +190,10 @@ helm upgrade --install specificai \
 Every chart version is signed with [cosign](https://docs.sigstore.dev/). The
 public key is
 [`cosign.pub`](https://github.com/marketplace-specificai/specificai-platform/blob/main/cosign.pub)
-at the root of the public repository:
+at the root of the public repository. Download it, then verify:
 
 ```bash
+curl -fsSLO https://raw.githubusercontent.com/marketplace-specificai/specificai-platform/main/cosign.pub
 cosign verify --key cosign.pub \
   ghcr.io/marketplace-specificai/specificai-platform:4.10.2
 ```
