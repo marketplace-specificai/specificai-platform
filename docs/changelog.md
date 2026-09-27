@@ -1,11 +1,11 @@
 # Changelog
 
-## 4.10.2 — 2026-09-24
+## 4.11.0 — 2026-09-27
 
-`playground` `infrastructure`
+`classification` `ner` `summarization` `content-generation` `playground` `infrastructure` `ui`
 
-- The chart is now also distributed through a public GHCR channel: anonymous `helm pull` from `oci://ghcr.io/marketplace-specificai` with no registry login required, and every published chart version is signed with cosign so its provenance can be verified. The install documentation is restructured around a channel chooser, with the public GHCR channel first and AWS Marketplace ECR as the alternative. `infrastructure`
 - Playground GPU inference (summarization / vLLM) is now enabled on GCP. The KEDA operator remains a cluster-wide singleton so multi-namespace installs share one controller. `playground` `infrastructure`
+- Model Configuration is redesigned. Generative tasks (summarization and content generation) get Commercial model / SpecificAI model tabs: the SpecificAI tab configures the student system prompt, user prompt, and output format per field as Same as commercial, Disable, or Customize, replacing the Train -> Advanced "Include prompt in training & evaluation" checkbox. The user prompt editor shows template tokens as pills with a Template/Preview switch and an Additional fields rail for inserting dataset columns as context. New "When evaluating" settings (Normalize casing, Strip whitespace, Fix JSON format) clean model outputs before evaluation comparison for all task types (POST /save_evaluation_normalization, Editor or Admin role). `ui` `summarization` `content-generation` `classification` `ner`
 
 ## 4.10.0 — 2026-09-22
 

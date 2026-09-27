@@ -2,7 +2,7 @@
 
 The platform's features, the chart version each first shipped in,
 and its cloud availability — generated from the release catalog for
-platform version **4.10.2**.
+platform version **4.11.0**.
 
 **Clouds** reads as follows:
 
@@ -25,10 +25,12 @@ Since **3.9.1** · Clouds: **All clouds**
 | NER task type | 3.9.1 | All clouds |
 | Summarization task type | 3.9.1 | All clouds |
 | Generative base model selection | 4.9.0 | Partial |
+| Evaluation output cleanup ("When evaluating") | 4.11.0 | On request |
 | Subtasks | 3.9.1 | All clouds |
 | ↳ Smart stratification for multi-task datasets | 3.9.1 | All clouds |
 | ↳ Multiple tasks in single model | 3.9.1 | All clouds |
 | Improved classification | 3.9.1 | All clouds |
+| Soft-label (distillation) training from teacher probabilities | 4.9.0 | On request |
 | Per-label confidence threshold tuning | 3.9.1 | All clouds |
 | Per-entity-type confidence threshold tuning | 4.0.0 | All clouds |
 | CPU and GPU training and evaluation | 3.9.1 | All clouds |
@@ -89,6 +91,7 @@ Since **3.9.1** · Clouds: **All clouds**
 | ↳ OpenAI | 3.9.1 | All clouds |
 | ↳ Google | 3.9.1 | All clouds |
 | ↳ Anthropic | 3.9.1 | All clouds |
+| ↳ TypeSafe AI (Jev) | 4.9.0 | On request |
 | Cloud provider model services | 3.9.1 | All clouds |
 | ↳ Amazon Bedrock | 3.9.1 | Partial |
 | ↳ Google Vertex AI | 3.9.1 | Partial |
