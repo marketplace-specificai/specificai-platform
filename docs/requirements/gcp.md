@@ -63,11 +63,33 @@ separate and is covered below.
 The cluster needs Workload Identity Federation for GKE enabled — object
 storage authentication depends on it, as described under **Cloud services**.
 
+### Resource labels
+
+Google requires a partner-solution tracking label on the Google Cloud
+resources you provision for the platform. This is a Google Cloud resource
+label — it is not a Kubernetes node label, and it is distinct from the
+`workload` labels the chart uses for scheduling.
+
+Set this exact label on the GKE cluster, on every node pool you create
+(including GPU pools you pre-create yourself), on the reserved static IP, on
+the GCS bucket, and on any other label-capable Google Cloud resource you
+create for the platform.
+
+| Label key | Label value |
+|---|---|
+| `goog-partner-solution` | `isol_plb32_001kf00001hbzkiia1_qmchpi3pls7rd4drgdwvxj7i47gj56fo` |
+
+Keep the `goog-` prefix; Google requires it for partner-solution tracking.
+Service accounts cannot carry resource labels, and neither can VPC networks,
+subnets, or IAM bindings.
+
 ## Node pools
 
 The chart schedules work onto six named tiers. Each tier is a `workload` label
 value; the chart's node selectors and matching tolerations are already set in
-the values files, so you do not assign these by hand.
+the values files, so you do not assign these by hand. That Kubernetes
+`workload` label is for scheduling only — it is not a substitute for the
+Google Cloud resource label under **Resource labels**.
 
 | Node pool | Instance type | Accelerator | Purpose |
 |---|---|---|---|
