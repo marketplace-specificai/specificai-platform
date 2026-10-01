@@ -110,8 +110,8 @@ is not used on AWS; leave `global.gateway.enabled` at `false`.
 ### Object storage
 
 One dedicated S3 bucket holds datasets, checkpoints, and trained model
-artifacts. Set it on `global.bucketName`, with the region on
-`backend.storage.s3.region`.
+artifacts. Set it on `global.bucketName` and on `backend.storage.s3.bucketName`,
+with the region on `backend.storage.s3.region`.
 
 The bucket must contain a `deployed_models/` prefix. The Triton inference
 server uses it as its model repository path and will not start without it.
@@ -143,10 +143,8 @@ rule {
 ```
 
 Grant access with IAM Roles for Service Accounts and pass the role ARN as
-`global.roleId`. If you leave `global.roleId` empty, the platform's pods run
-with the EKS worker node role or an EKS Pod Identity association instead, so
-attach the policy there. These are the only S3 actions the platform
-performs, so the policy can stop here.
+`global.roleId`; the EKS worker node role works as a fallback. These are the
+only S3 actions the platform performs, so the policy can stop here.
 
 ```terraform
 actions = [
@@ -189,8 +187,6 @@ If you would rather run a managed broker, the platform also speaks Kafka. Set
 `KAFKA_SASL_MECHANISM: SCRAM-SHA-512`, `KAFKA_SECURITY_PROTOCOL: SASL_SSL`, and
 `KAFKA_ENV: cloud` are already correct. Only one broker is active at a time.
 
---8<-- "_snippets/required-values-aws.md"
-
 --8<-- "_snippets/secrets.md"
 
 --8<-- "_snippets/outbound-endpoints.md"
@@ -201,8 +197,14 @@ Once the cluster, the bucket, and the database exist, choose the values file
 that matches your cluster mode — `aws-auto-mode.values.yaml` or
 `aws-standard.values.yaml` — and fill in the placeholders it marks.
 
-Then follow the [install guide](../install.md) to pull the chart — it is public
-on GitHub Container Registry and needs no credentials — install it with your
-values file and your Docker token, and verify the deployment. The chart version you install
-determines the platform version; see the changelog for what each release
-contains.
+The platform chart is distributed through the AWS Marketplace container
+registry as
+`709825985650.dkr.ecr.us-east-1.amazonaws.com/specific-ai/specificai-platform`.
+Access is granted to your AWS account when your subscription is set up; send
+SpecificAI DevOps your AWS account ID to have it enabled. The
+[registry access page](../registry-access.md) describes the exchange.
+
+Then follow the [install guide](../install.md) to log in to the registry,
+install the chart with your values file, and verify the deployment. The chart
+version you install determines the platform version; see the changelog for
+what each release contains.

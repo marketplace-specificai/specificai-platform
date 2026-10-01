@@ -2,7 +2,7 @@
 
 The platform's features, the chart version each first shipped in,
 and its cloud availability — generated from the release catalog for
-platform version **4.13.0**.
+platform version **4.11.2**.
 
 **Clouds** reads as follows:
 
@@ -25,8 +25,6 @@ Since **3.9.1** · Clouds: **All clouds**
 | NER task type | 3.9.1 | All clouds |
 | Summarization task type | 3.9.1 | All clouds |
 | Generative base model selection | 4.9.0 | Partial |
-| ↳ Base model selection for classification and NER | 4.13.0 | On request |
-| Agentic task (Autonomy Level 2-4) | 4.13.0 | On request |
 | Evaluation output cleanup ("When evaluating") | 4.11.0 | On request |
 | Subtasks | 3.9.1 | All clouds |
 | ↳ Smart stratification for multi-task datasets | 3.9.1 | All clouds |
@@ -109,6 +107,4 @@ Since **3.9.1** · Clouds: **All clouds**
 | FullStory browser analytics | 3.9.1 | All clouds |
 | W&B model training analytics | 3.9.1 | All clouds |
 | Okta OIDC login | 4.2.0 | Partial |
-| Batch API architecture (caller / poller / fetcher split) | 4.13.0 | On request |
 | Arena customer clients vs internal environments | 4.8.1 | All clouds |
-| Generated customer values templates and required-values reference | 4.13.0 | On request |
