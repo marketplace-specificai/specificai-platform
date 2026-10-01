@@ -56,12 +56,9 @@ theme:
 
 # The snippet sources are included into the cloud pages, not served as pages of
 # their own. This only affects rendering — transform_content.py still copies
-# them to the public repo, where that build needs them on disk. The
-# infra-changes/ guides are fragments too: transform_content.py renders them
-# into the public docs/infra-changelog.md and never stages them on their own.
+# them to the public repo, where that build needs them on disk.
 exclude_docs: |
   _snippets/
-  infra-changes/
 
 nav:
   - Home: index.md
@@ -80,10 +77,8 @@ nav:
       - Azure AKS Standard: values/azure-standard.md
       - Google GKE Autopilot: values/gcp-autopilot.md
       - Google GKE Standard: values/gcp-standard.md
-      - Secrets: values/secrets.md
   - Feature availability: features.md
   - Changelog: changelog.md
-  - Infrastructure changelog: infra-changelog.md
   - Support: support.md
 
 markdown_extensions:
@@ -122,8 +117,8 @@ extra_css:
   - stylesheets/extra.css
 
 extra:
-  latest_release: "4.13.0"
-  latest_release_anchor: "4130-2026-09-30"
+  latest_release: "4.11.1"
+  latest_release_anchor: "4111-2026-10-01"
   generator: false
   social:
     - icon: fontawesome/brands/github

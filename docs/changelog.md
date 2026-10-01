@@ -1,20 +1,14 @@
 # Changelog
 
-## 4.13.0 — 2026-09-30
+## 4.11.1 — 2026-10-01
 
-`inference` `infrastructure` `security`
+`classification` `ner` `summarization` `content-generation` `infrastructure` `ui`
 
-> ⚠️ **Before upgrading, an infrastructure change is required.**
-> Platform container images are now served from the `specificai/platform` Docker Hub repository. Set `common.secrets.dockerConfigJson` (the `docker-ro-creds` image pull Secret) to the registry token SpecificAI provides, in the same `helm upgrade` that installs this version. If you manage `docker-ro-creds` outside Helm (`global.createSecret: false`), update that Secret before upgrading. Without the new token, pods fail with `ImagePullBackOff`. The chart's values schema now also fails the upgrade when `global.cloudRegion`, `global.bucketName`, `global.roleId` or `global.optuneAddress` still holds a `<...>` placeholder, when `global.bucketName` or `global.optuneAddress` is empty, or when `global.roleId` is empty on Azure or GCP. Set those values first; the upgrade guide's "Moving to the generated values templates" section covers the rest of the move. [Step-by-step instructions](infra-changelog.md#4130-2026-09-30).
-
-- Platform container images are now served from the `specificai/platform` Docker Hub repository. Set `common.secrets.dockerConfigJson` to the registry token SpecificAI provides, in the same `helm upgrade` that installs this version. `infrastructure` `security`
-- The job-runner Deployment now sets `imagePullSecrets` from `global.imagePullSecretsName`, like every other platform workload. `infrastructure`
-- Model image builds authenticate the base-image pull with the image pull Secret, mounted read-only into the image-builder Job. Pushes to ECR, GCR / Artifact Registry and ACR use it alongside the destination credential; a Docker Hub push builds to a local tarball with the pull credential and then pushes with your Docker Hub token alone. `inference` `infrastructure`
-- New opt-in batch processing services (batch-poller, teacher-fetcher, judgment-fetcher, generation-fetcher) split vendor LLM batch submission, polling, and result fetching into independently scaled KEDA jobs. All four are disabled by default; existing inline polling is unchanged unless you enable them. `infrastructure`
-- The six values templates are now generated from the chart itself. Each sets live only what its cluster type needs and lists every other setting as a commented line showing the chart default, so nothing you leave commented is pinned. Credentials moved to a separate `secrets.values.example.yaml` for a two-file install. `infrastructure`
-- The chart's values schema rejects an install that leaves a `<...>` placeholder in the core `global` values or leaves `global.bucketName`, `global.optuneAddress` or (on Azure and GCP) `global.roleId` empty, instead of failing later at runtime. On AWS an empty `global.roleId` still installs and leaves pods on the EKS node role or Pod Identity; the AWS service account no longer gets an empty `eks.amazonaws.com/role-arn` annotation in that case. `infrastructure`
-- Each cloud's requirements page now has a Required values table and the Secrets section a table of credential values, both generated from the chart. The upgrade guide covers moving an existing values file to the new templates, the Azure storage-account-key upgrade path, and keys the chart no longer reads. `infrastructure`
-- A new Infrastructure changelog page lists every chart version with the infrastructure change it needs, if any, as step-by-step Console, CLI and Verify instructions for each affected cloud. Every "an infrastructure change is required" warning in the changelog and the upgrade guide now links to that version's section. `infrastructure`
+- Evaluation metrics are exported to observability per section (general metrics, per-class metrics, span-level metrics, threshold calibration, generative classic and LLM-judge scores), one row per training run, model kind and language, each redacted and size-capped on its own. Large label sets are no longer trimmed out of the export, and re-evaluation runs are attributed to the training version they re-evaluated. `infrastructure` `classification` `ner` `summarization` `content-generation`
+- Quality telemetry (accuracy, precision, recall, F-score, confusion matrix, model-response matrix, summarization metrics and judge criteria) is exported per language and per label, matching the selections available on the Evaluation screen. `infrastructure` `classification` `ner` `summarization` `content-generation`
+- Starting a training run with languages the selected base model does not support now emits a structured warning log (`alert_fields` are lifted to top-level log keys) so it can be alerted on. `infrastructure` `classification` `ner`
+- Two-label classification tasks ask "What matters most for these labels?" (equally important, don't miss a label, or avoid its false detections) in Business Goals and in Edit Task. The choice sets the Fallback label and the training defaults (F-score beta and the "Optimize on" label in Train > Advanced); Data Collection and Train block when the chosen label is no longer one of the task's labels. Existing two-label tasks default to "Both labels are equally important". `ui` `classification`
+- The Evaluation Threshold card gains a False Positive Rate section: FPR = FP / (FP + TN) for the selected label, previewed live, with a slider and numeric input linked to the threshold slider. `ui` `classification`
 
 ## 4.11.0 — 2026-09-27
 
@@ -23,20 +17,12 @@
 - Playground GPU inference (summarization / vLLM) is now enabled on GCP. The KEDA operator remains a cluster-wide singleton so multi-namespace installs share one controller. `playground` `infrastructure`
 - Model Configuration is redesigned. Generative tasks (summarization and content generation) get Commercial model / SpecificAI model tabs: the SpecificAI tab configures the student system prompt, user prompt, and output format per field as Same as commercial, Disable, or Customize, replacing the Train -> Advanced "Include prompt in training & evaluation" checkbox. The user prompt editor shows template tokens as pills with a Template/Preview switch and an Additional fields rail for inserting dataset columns as context. New "When evaluating" settings (Normalize casing, Strip whitespace, Fix JSON format) clean model outputs before evaluation comparison for all task types (POST /save_evaluation_normalization, Editor or Admin role). `ui` `summarization` `content-generation` `classification` `ner`
 
-## 4.10.2 — 2026-09-23
-
-`playground` `data-preparation` `infrastructure` `ui`
-
-- The chart is now also distributed through a public GHCR channel: anonymous `helm pull` from `oci://ghcr.io/marketplace-specificai` with no registry login required, and every published chart version is signed with cosign so its provenance can be verified. The install documentation is restructured around a channel chooser, with the public GHCR channel first and AWS Marketplace ECR as the alternative. `infrastructure`
-- Playground GPU inference (summarization / vLLM) is now enabled on GCP. The KEDA operator remains a cluster-wide singleton so multi-namespace installs share one controller. `playground` `infrastructure`
-- Retrieval Agent can research Hugging Face and Kaggle dataset candidates with Tavily before searching those hubs. Editors and Admins set a per-user Tavily API key under Settings → Tavily API Key. `data-preparation` `ui`
-
 ## 4.10.0 — 2026-09-22
 
 `summarization` `content-generation` `playground` `infrastructure` `security`
 
 > ⚠️ **Before upgrading, an infrastructure change is required.**
-> The Playground GPU pod's memory request/limit rises to 40Gi/52Gi so all sleeping vLLM engines' weights fit in RAM, and on AWS the gpu-basic tier promotes g5.2xlarge to g5.4xlarge. Review the GPU tier and node sizes you have provisioned before upgrading. [Step-by-step instructions](infra-changelog.md#4100-2026-09-22).
+> The Playground GPU pod's memory request/limit rises to 40Gi/52Gi so all sleeping vLLM engines' weights fit in RAM, and on AWS the gpu-basic tier promotes g5.2xlarge to g5.4xlarge. Review the GPU tier and node sizes you have provisioned before upgrading. See the requirements pages for details.
 
 - New opt-in `common.karpenter.s3CsiStartupTaint` (off by default) makes AWS Karpenter nodes wait for the Mountpoint-S3 CSI driver to register before workloads schedule onto them. Turn it on only after upgrading Mountpoint-S3 CSI to 2.1.0 or later — the pinned v1.15 driver never clears the taint, which leaves workloads Pending. `infrastructure`
 - Playground GPU pods now run one vLLM engine per base model a task needs, multiplexed on a single GPU. Idle engines park their weights in host RAM and exactly one is awake at a time, so a task whose trained models span several base models no longer needs a GPU each. LoRA adapters are always served on the base model they were trained on. `playground` `infrastructure`
@@ -74,7 +60,7 @@
 `infrastructure`
 
 > ⚠️ **Before upgrading, an infrastructure change is required.**
-> Karpenter node expiry and the node termination grace period now match the training and evaluation Jobs' own deadlines (72h on GPU pools, 168h on CPU pools) on AWS and Azure. NodeClaims are immutable, so nodes already running keep the old policy until they are replaced. [Step-by-step instructions](infra-changelog.md#470-2026-09-12).
+> Karpenter node expiry and the node termination grace period now match the training and evaluation Jobs' own deadlines (72h on GPU pools, 168h on CPU pools) on AWS and Azure. NodeClaims are immutable, so nodes already running keep the old policy until they are replaced. See the requirements pages for details.
 
 - Karpenter node pools no longer force-kill long-running training and evaluation Jobs. Node expiry and the node termination grace period now match the Jobs' own deadlines (72h on GPU pools, 168h on CPU pools) on AWS and Azure. Previously a node was reclaimed 24 hours after boot and the run failed with "Training job terminated before cleanup". Idle nodes are still recycled within five minutes. Upgrade note: NodeClaims are immutable, so nodes already running keep the old policy until they are replaced. `infrastructure`
 
@@ -90,7 +76,7 @@
 `infrastructure` `security`
 
 > ⚠️ **Before upgrading, an infrastructure change is required.**
-> Existing Azure installs: `spec.csi.volumeAttributes` and `mountOptions` are immutable on a bound PersistentVolume, so scale the backend down and delete `<namespace>-backend-pvc` and `<namespace>-backend-pv` before upgrading; the reclaim policy leaves the blob data untouched. Azure installs also need `backend.storage.blob.resourceGroup` and `specificai-inference.models.blob` set. AWS and GCP are unaffected. [Step-by-step instructions](infra-changelog.md#450-2026-09-08).
+> Existing Azure installs: `spec.csi.volumeAttributes` and `mountOptions` are immutable on a bound PersistentVolume, so scale the backend down and delete `<namespace>-backend-pvc` and `<namespace>-backend-pv` before upgrading; the reclaim policy leaves the blob data untouched. Azure installs also need `backend.storage.blob.resourceGroup` and `specificai-inference.models.blob` set. AWS and GCP are unaffected. See the requirements pages for details.
 
 - Azure Blob storage no longer needs a storage account key. The backend models volume and the Triton inference model repository both mount the models container with the Blob CSI driver using Workload Identity, so the storage account can disable shared-key access entirely. Controlled by `global.azure.useWorkloadIdentityForBlob`, which defaults to true; set it to false to restore the previous account-key path. `infrastructure` `security`
 - Azure installs now need `backend.storage.blob.resourceGroup` and `specificai-inference.models.blob` (`enabled`, `accountName`, `containerName`, `resourceGroup`) — the resource group of the storage account, not the AKS `MC_*` group. The render fails with an actionable message when the Workload Identity path is on and those are missing. `infrastructure`

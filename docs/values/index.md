@@ -16,8 +16,6 @@ marks, and pass it to `helm upgrade --install` as described in the
 
 The chart cannot detect which mode your cluster runs in, and applying the
 wrong file can leave GPU pods pending indefinitely — each file's header
-comments name the exact mode it is for. Credentials go in a second file,
-[`secrets.values.example.yaml`](secrets.md), shared by every cluster type. The
-raw files live in the
+comments name the exact mode it is for. The raw files live in the
 [`values/` directory](https://github.com/marketplace-specificai/specificai-platform/tree/main/values) of this
 repository.
