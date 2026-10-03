@@ -1,5 +1,12 @@
 # Changelog
 
+## 4.11.3 — 2026-10-03
+
+`infrastructure` `ui`
+
+- Telemetry export gains metadata-only fields for the user-journey funnel: the task's last creation-wizard step, the improvement method of a training run (AI, human or both), whether a run is a re-evaluation, per-task training / improvement run counters, and a per-version quality-delta gauge that carries the previous version's score as the baseline. No task content or identities are exported. `infrastructure`
+- The task creation wizard stamps the current step on the task (POST /task-wizard-step) so observability can show where drafts stall; nothing in the product reads the value back. `infrastructure` `ui`
+
 ## 4.11.2 — 2026-10-01
 
 `classification`

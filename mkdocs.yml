@@ -117,8 +117,8 @@ extra_css:
   - stylesheets/extra.css
 
 extra:
-  latest_release: "4.11.2"
-  latest_release_anchor: "4112-2026-10-01"
+  latest_release: "4.11.3"
+  latest_release_anchor: "4113-2026-10-03"
   generator: false
   social:
     - icon: fontawesome/brands/github
