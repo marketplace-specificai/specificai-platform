@@ -171,6 +171,26 @@ Google Cloud service account, grant it the **Storage Bucket Admin** role on
 the bucket, and pass its email as `global.roleId`. The Kubernetes service
 accounts the chart creates authenticate as that service account.
 
+**Vertex AI.** Enable the Vertex AI API (`aiplatform.googleapis.com`) in the
+project. Grant that same service account the **Vertex AI User** role
+(`roles/aiplatform.user`) so the platform can list models and run inference.
+The role does not allow deploying or deleting models. If a predefined role is
+not allowed, these permissions are enough: `aiplatform.models.list`,
+`aiplatform.models.get`, `aiplatform.endpoints.predict`, and
+`aiplatform.endpoints.get`.
+
+Triton can use a dedicated inference service account on the same bucket. Pass
+its email as `specificai-inference.serviceAccount.roleId`. That account needs
+both roles:
+
+- `roles/storage.legacyBucketReader` — bucket get and list
+  (`storage.buckets.get`).
+- `roles/storage.objectViewer` — object get (`storage.objects.get`), required
+  for Triton to read `config.pbtxt` and the model files.
+
+The model-repository poll reads those objects after it has listed the bucket,
+so a deploy fails when object get is missing.
+
 The platform mounts the bucket with the Cloud Storage FUSE CSI driver, which
 ships with GKE but is enabled per cluster. Autopilot enables it by default; on
 GKE Standard, enable the add-on:

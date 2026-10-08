@@ -1,5 +1,11 @@
 # Changelog
 
+## 4.11.4 — 2026-10-08
+
+`infrastructure`
+
+- The RabbitMQ Erlang cookie no longer changes between renders. When `rabbitmq.auth.erlangCookie` is empty, the chart derives a stable cookie for each install from the broker password, the release name and the namespace, and stores it in its own Secret (`rabbitmq.auth.existingErlangSecret`). Tools that render the chart with `helm template`, such as Argo CD, no longer restart the broker on every sync. Set `rabbitmq.auth.erlangCookie` to pin your own value, or point `rabbitmq.auth.existingErlangSecret` at a Secret you manage. The broker restarts once during this upgrade. `infrastructure`
+
 ## 4.11.3 — 2026-10-03
 
 `infrastructure` `ui`
