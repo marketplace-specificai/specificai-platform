@@ -4,31 +4,34 @@ The platform reads its credentials from four Kubernetes Secrets: registry
 access, service credentials, single sign-on, and the observability key.
 
 The Helm chart creates all four for you from values you pass at install time.
-If your organization manages Secrets outside Helm, set `global.createSecret` to
-`false` and create them yourself with the names and keys below. The names are
-chart defaults and can be changed — each row names the value that renames it.
+If your organization manages Secrets outside Helm, create them yourself with
+the names and keys below and turn off the chart's own copies, as described
+under **Creating the Secrets yourself**. The names are chart defaults that can
+be changed, and each row names the value that renames it; only
+`coralogix-keys` has a fixed name.
 
 | Secret | Keys | Purpose |
 |---|---|---|
-| `docker-ro-creds` | `.dockerconfigjson` | Registry credentials used as `imagePullSecrets` by every platform workload. Renamed by `global.imagePullSecretsName`.<br><br>See the registry note below — this is not always needed. |
+| `docker-ro-creds` | `.dockerconfigjson` | Registry credentials that every platform workload, including the backend and the batch jobs, uses as its `imagePullSecrets`. Renamed by `global.imagePullSecretsName`.<br><br>Holds the Docker token SpecificAI issues you. See the registry note below. |
 | `specificai-secrets` | `DB_CONNECTION_STRING`<br>`RABBITMQ_PASSWORD`<br>`KAFKA_PASSWORD`<br>`SUPERVISOR_ADMIN_TOKEN`<br>`KAGGLE_API_TOKEN` | Service credentials, mounted into every pod with `envFrom`. Renamed by `global.envFromSecret`.<br><br>Supply `DB_CONNECTION_STRING` and the password for whichever message broker you run. See the key notes below. |
 | `specificai-auth-secret` | Depends on your identity provider | Single sign-on credentials. Renamed by `global.optuneAuthSecretName`. See the table below. |
-| `coralogix-keys` | `PRIVATE_KEY` | Coralogix send-your-data key. The chart installs a Coralogix OpenTelemetry agent that reports platform telemetry to SpecificAI; the key is issued to you by SpecificAI. |
+| `coralogix-keys` | `PRIVATE_KEY` | Coralogix send-your-data key. The chart installs a Coralogix OpenTelemetry agent that reports platform telemetry to SpecificAI; the key is issued to you by SpecificAI. The agent always reads a Secret with this name. |
+
+### Secret values
+
+--8<-- "_snippets/secret-values.md"
 
 ### Registry credentials
 
-`docker-ro-creds` holds credentials for the registry your platform images are
-pulled from, and which registry that is depends on how you obtained the chart.
-
-The standard distribution pulls images from SpecificAI's Docker Hub
-organization and needs a read-only Docker Hub credential, which SpecificAI
-DevOps issues before installation. The **AWS Marketplace** distribution is
-published with its image references already rewritten to the marketplace
-container registry, and access to that registry is granted to your cloud
-account rather than to a username and password.
-
-Every workload still carries the `imagePullSecrets` reference either way, so
-keep the Secret name configured; only whether it holds a credential changes.
+`docker-ro-creds` holds the read-only Docker token SpecificAI issues you for
+the platform's container images, which are stored in SpecificAI's private
+Docker Hub repository `specificai/platform`. Every workload references it as
+its `imagePullSecrets`, and model image builds also use it to pull their base
+image. The chart creates it from `common.secrets.dockerConfigJson`; the
+install guide shows how to generate that value from your username and token.
+When SpecificAI sends you a new token, update this Secret in the same
+`helm upgrade` — see the registry access page. The Helm chart itself is
+public and needs no credential.
 
 ### Key notes
 
@@ -63,3 +66,28 @@ unset.
 The redirect URI is `https://<your platform hostname>/api/auth/<provider>/callback`,
 using the hostname you set as `global.optuneAddress`. Register that exact URI
 with your identity provider.
+
+### Creating the Secrets yourself
+
+With `global.createSecret` set to `false`, the chart creates none of
+`docker-ro-creds`, `specificai-secrets` or `specificai-auth-secret`. Create
+all three in the platform namespace before you install. The backend does not
+start without `specificai-auth-secret`, so create it even if you do not use
+single sign-on; it can be empty.
+
+`global.createSecret` does not cover `coralogix-keys`. Also set
+`common.coralogix.secret.create` to `false`, and create the Secret under
+exactly that name with the key `PRIVATE_KEY`: the Coralogix agent always reads
+`coralogix-keys`, whatever `common.coralogix.secret.secretName` is set to.
+
+To keep the RabbitMQ password out of your values file as well, point the
+broker and KEDA at `specificai-secrets`: set
+`rabbitmq.auth.existingPasswordSecret` to its name,
+`rabbitmq.auth.existingSecretPasswordKey` to `RABBITMQ_PASSWORD`, and
+`global.kedaRabbitmqAuth.existingSecret` to its name. The chart derives the
+broker's Erlang cookie from that password only when it is passed as a value,
+so in this setup it cannot derive one. Create a Secret once with a random
+alphanumeric `rabbitmq-erlang-cookie` key, for example the output of
+`openssl rand -hex 32`, and set `rabbitmq.auth.existingErlangSecret` to its
+name. Any name works except `<release>-rabbitmq-erlang-cookie`, which the
+chart uses for its own.

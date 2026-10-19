@@ -89,6 +89,34 @@ ingress controller; the chart does not install one.
 | `global.optuneAddress` | The hostname the platform is served on. Used as the Ingress host and as the base of the single sign-on redirect URI. |
 | `global.ingress.createIngress` | Whether the chart renders the Ingress. Default `true`. |
 | `global.ingress.className` | The `ingressClassName` on the rendered Ingress. Default `nginx`. |
+| `global.ingress.controller` | The controller behind that class: `nginx` (ingress-nginx, the default) or `traefik` (Traefik's Kubernetes Ingress provider). |
+
+With `traefik`, set `global.ingress.className` to your Traefik IngressClass.
+The chart then also renders Traefik `Middleware` objects for the public API
+paths, so Traefik's Kubernetes CRD provider must be enabled (the Traefik Helm
+chart enables it by default). Traefik reads each request for at most 60
+seconds by default; raise `transport.respondingTimeouts.readTimeout` on its
+entry points so large dataset uploads are not cut off.
+
+The chart creates those Middlewares in the platform namespace by default. If
+Traefik's CRD provider watches only some namespaces
+(`providers.kubernetesCRD.namespaces`), it never loads them, Traefik does not
+create the routes that reference them, and the public API paths stop working.
+In that case set `global.ingress.traefik.middlewareNamespace` to a namespace the
+provider watches. The chart then creates the Middlewares there, prefixes their
+names with the platform namespace so that several platform installs can share
+that namespace, and has the Ingresses reference them as
+`<namespace>-<name>@kubernetescrd`. This does not need
+`providers.kubernetesCRD.allowCrossNamespace`, which applies to IngressRoutes,
+not to the Ingress annotations the chart uses. If you deploy with Argo CD, the
+AppProject of the platform Application must allow that namespace as a
+destination.
+
+Two more Traefik options affect those references, whichever namespace holds
+the Middlewares. If you set `providers.kubernetesIngress.crossProviderNamespaces`,
+include the platform namespace in it. Leave `providers.kubernetesCRD.safeNaming`
+unset or `false`: with it enabled, Traefik expects the form
+`<namespace>_<name>@kubernetescrd` and does not create the platform's routes.
 
 Create a DNS record for `global.optuneAddress` pointing at your ingress
 controller's load balancer. Use a CNAME to the load balancer's DNS name rather
@@ -110,8 +138,8 @@ is not used on AWS; leave `global.gateway.enabled` at `false`.
 ### Object storage
 
 One dedicated S3 bucket holds datasets, checkpoints, and trained model
-artifacts. Set it on `global.bucketName` and on `backend.storage.s3.bucketName`,
-with the region on `backend.storage.s3.region`.
+artifacts. Set it on `global.bucketName`, with the region on
+`backend.storage.s3.region`.
 
 The bucket must contain a `deployed_models/` prefix. The Triton inference
 server uses it as its model repository path and will not start without it.
@@ -143,8 +171,10 @@ rule {
 ```
 
 Grant access with IAM Roles for Service Accounts and pass the role ARN as
-`global.roleId`; the EKS worker node role works as a fallback. These are the
-only S3 actions the platform performs, so the policy can stop here.
+`global.roleId`. If you leave `global.roleId` empty, the platform's pods run
+with the EKS worker node role or an EKS Pod Identity association instead, so
+attach the policy there. These are the only S3 actions the platform
+performs, so the policy can stop here.
 
 ```terraform
 actions = [
@@ -187,6 +217,8 @@ If you would rather run a managed broker, the platform also speaks Kafka. Set
 `KAFKA_SASL_MECHANISM: SCRAM-SHA-512`, `KAFKA_SECURITY_PROTOCOL: SASL_SSL`, and
 `KAFKA_ENV: cloud` are already correct. Only one broker is active at a time.
 
+--8<-- "_snippets/required-values-aws.md"
+
 --8<-- "_snippets/secrets.md"
 
 --8<-- "_snippets/outbound-endpoints.md"
@@ -197,14 +229,8 @@ Once the cluster, the bucket, and the database exist, choose the values file
 that matches your cluster mode — `aws-auto-mode.values.yaml` or
 `aws-standard.values.yaml` — and fill in the placeholders it marks.
 
-The platform chart is distributed through the AWS Marketplace container
-registry as
-`709825985650.dkr.ecr.us-east-1.amazonaws.com/specific-ai/specificai-platform`.
-Access is granted to your AWS account when your subscription is set up; send
-SpecificAI DevOps your AWS account ID to have it enabled. The
-[registry access page](../registry-access.md) describes the exchange.
-
-Then follow the [install guide](../install.md) to log in to the registry,
-install the chart with your values file, and verify the deployment. The chart
-version you install determines the platform version; see the changelog for
-what each release contains.
+Then follow the [install guide](../install.md) to pull the chart — it is public
+on GitHub Container Registry and needs no credentials — install it with your
+values file and your Docker token, and verify the deployment. The chart version you install
+determines the platform version; see the changelog for what each release
+contains.

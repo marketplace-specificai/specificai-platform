@@ -107,6 +107,34 @@ ingress controller; the chart does not install one.
 | `global.optuneAddress` | The hostname the platform is served on. Used as the Ingress host and as the base of the single sign-on redirect URI. |
 | `global.ingress.createIngress` | Whether the chart renders the Ingress. Default `true`. |
 | `global.ingress.className` | The `ingressClassName` on the rendered Ingress. Default `nginx`. |
+| `global.ingress.controller` | The controller behind that class: `nginx` (ingress-nginx, the default) or `traefik` (Traefik's Kubernetes Ingress provider). |
+
+With `traefik`, set `global.ingress.className` to your Traefik IngressClass.
+The chart then also renders Traefik `Middleware` objects for the public API
+paths, so Traefik's Kubernetes CRD provider must be enabled (the Traefik Helm
+chart enables it by default). Traefik reads each request for at most 60
+seconds by default; raise `transport.respondingTimeouts.readTimeout` on its
+entry points so large dataset uploads are not cut off.
+
+The chart creates those Middlewares in the platform namespace by default. If
+Traefik's CRD provider watches only some namespaces
+(`providers.kubernetesCRD.namespaces`), it never loads them, Traefik does not
+create the routes that reference them, and the public API paths stop working.
+In that case set `global.ingress.traefik.middlewareNamespace` to a namespace the
+provider watches. The chart then creates the Middlewares there, prefixes their
+names with the platform namespace so that several platform installs can share
+that namespace, and has the Ingresses reference them as
+`<namespace>-<name>@kubernetescrd`. This does not need
+`providers.kubernetesCRD.allowCrossNamespace`, which applies to IngressRoutes,
+not to the Ingress annotations the chart uses. If you deploy with Argo CD, the
+AppProject of the platform Application must allow that namespace as a
+destination.
+
+Two more Traefik options affect those references, whichever namespace holds
+the Middlewares. If you set `providers.kubernetesIngress.crossProviderNamespaces`,
+include the platform namespace in it. Leave `providers.kubernetesCRD.safeNaming`
+unset or `false`: with it enabled, Traefik expects the form
+`<namespace>_<name>@kubernetescrd` and does not create the platform's routes.
 
 Create a DNS record for `global.optuneAddress` pointing at your ingress
 controller's public IP. Reserve a static public IP for the controller so the
@@ -198,17 +226,20 @@ Kafka endpoint, set `KAFKA_ENV: eventhub` and `KAFKA_SASL_MECHANISM: PLAIN`,
 and supply the policy's connection string as the `KAFKA_PASSWORD` key
 described under **Secrets**. Only one broker is active at a time.
 
+--8<-- "_snippets/required-values-azure.md"
+
 --8<-- "_snippets/secrets.md"
 
 ### Blob storage needs no secret on Azure
 
-Object storage is deliberately absent from the table above. The platform
-authenticates to the storage account through the federated managed identities
-described under **Cloud services**, so there is no storage account key to
-create, store, or rotate. A legacy account-key mode
+Object storage is deliberately absent from the Secrets table above. The
+platform authenticates to the storage account through the federated managed
+identities described under **Cloud services**, so there is no storage account
+key to create, store, or rotate. A legacy account-key mode
 (`global.azure.useWorkloadIdentityForBlob: false`) is retained for one release
-so existing installs can upgrade before switching; it requires shared key
-access enabled on the storage account and will be removed.
+so existing installs can upgrade before switching; it is the only use of
+`backend.storage.blob.accountKey`, requires shared key access enabled on the
+storage account, and will be removed.
 
 --8<-- "_snippets/outbound-endpoints.md"
 
@@ -218,15 +249,7 @@ Once the cluster, the storage account, and the database exist, choose the
 values file that matches your cluster mode — `azure-automatic.values.yaml` or
 `azure-standard.values.yaml` — and fill in the placeholders it marks.
 
-The platform chart is distributed through the AWS Marketplace container
-registry as
-`709825985650.dkr.ecr.us-east-1.amazonaws.com/specific-ai/specificai-platform`.
-The registry is an Amazon ECR even when your platform runs on Azure, so
-SpecificAI DevOps issues you an AWS access key ID and secret access key with
-read-only access to pull the chart and images. The
-[registry access page](../registry-access.md) describes the exchange.
-
-Then follow the [install guide](../install.md) to log in to the registry,
-install the chart with your values file, and verify the deployment. The chart
-version you install determines the platform version; see the changelog for
-what each release contains.
+Then follow the [install guide](../install.md) to pull the chart — it is public
+on GitHub Container Registry and needs no credentials — install it with your
+values file and your Docker token, and verify the deployment. The chart version you install determines the platform version;
+see the changelog for what each release contains.

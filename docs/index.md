@@ -21,8 +21,9 @@ each chart-version release.
 1. Provision the infrastructure for your cloud:
    [AWS](requirements/aws.md), [Azure](requirements/azure.md), or
    [GCP](requirements/gcp.md).
-2. Arrange pull access to the chart registry — see
-   [Registry access](registry-access.md).
+2. Get your Docker token for the platform images from SpecificAI — see
+   [Registry access](registry-access.md). The Helm chart itself is public on GHCR and
+   needs no credentials.
 3. Pick the [Helm values template](values/index.md) that matches your cluster
    type and follow the [install guide](install.md).
 
