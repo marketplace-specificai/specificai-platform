@@ -1,5 +1,11 @@
 # Changelog
 
+## 4.14.7 — 2026-10-20
+
+`infrastructure`
+
+- The message broker is no longer restarted when a Karpenter-managed cluster (including EKS Auto Mode) consolidates its nodes. The broker pod was protected only from the Cluster Autoscaler, so Karpenter could drain the node it ran on, and every service lost its broker connection until the pod came back. The broker pod now also carries the annotation Karpenter honors. Upgrading restarts the broker once. `infrastructure`
+
 ## 4.14.6 — 2026-10-19
 
 `infrastructure` `security`

@@ -25,7 +25,7 @@ Chart versions before 4.13.0 are available on request from
 
 ```bash
 helm pull oci://ghcr.io/marketplace-specificai/specificai-platform \
-  --version 4.14.6
+  --version 4.14.7
 ```
 
 Optionally, render the chart locally to inspect it before installing. This
@@ -33,7 +33,7 @@ touches no cluster:
 
 ```bash
 helm template specificai \
-  specificai-platform-4.14.6.tgz \
+  specificai-platform-4.14.7.tgz \
   --set global.cloudProvider=gcp \
   --set global.roleId=platform@example-project.iam.gserviceaccount.com \
   --set global.bucketName=example-bucket \
@@ -123,7 +123,7 @@ Any namespace works; the examples use `specificai`.
 ```bash
 helm upgrade --install specificai \
   oci://ghcr.io/marketplace-specificai/specificai-platform \
-  --version 4.14.6 \
+  --version 4.14.7 \
   --namespace specificai --create-namespace \
   --values "${VALUES_FILE}" \
   --values secrets.values.yaml
@@ -203,7 +203,7 @@ at the root of the public repository. Download it, then verify:
 ```bash
 curl -fsSLO https://raw.githubusercontent.com/marketplace-specificai/specificai-platform/main/cosign.pub
 cosign verify --key cosign.pub \
-  ghcr.io/marketplace-specificai/specificai-platform:4.14.6
+  ghcr.io/marketplace-specificai/specificai-platform:4.14.7
 ```
 
 A failure means the artifact is not one SpecificAI released; do not install
