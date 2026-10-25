@@ -24,10 +24,10 @@
 
 <!--
   Static shields.io badges only — no external services beyond img.shields.io.
-  The 4.14.7 token is stamped with the released chart
+  The 4.14.8 token is stamped with the released chart
   version by transform_content.py at staging time.
 -->
-[![Chart version](https://img.shields.io/badge/chart-4.14.7-1753ff)](https://marketplace-specificai.github.io/specificai-platform/changelog/)
+[![Chart version](https://img.shields.io/badge/chart-4.14.8-1753ff)](https://marketplace-specificai.github.io/specificai-platform/changelog/)
 [![GHCR package](https://img.shields.io/badge/GHCR-specificai--platform-1753ff)](https://github.com/orgs/marketplace-specificai/packages/container/package/specificai-platform)
 [![License](https://img.shields.io/badge/license-Apache--2.0%20%2B%20CC%20BY%204.0-252a5c)](LICENSE)
 [![Documentation](https://img.shields.io/badge/docs-github.io-1753ff)](https://marketplace-specificai.github.io/specificai-platform/)
@@ -41,9 +41,9 @@ The Helm chart is public — pull and install it anonymously, no registry
 login:
 
 ```bash
-helm pull oci://ghcr.io/marketplace-specificai/specificai-platform --version 4.14.7
+helm pull oci://ghcr.io/marketplace-specificai/specificai-platform --version 4.14.8
 helm upgrade --install specificai oci://ghcr.io/marketplace-specificai/specificai-platform \
-  --version 4.14.7 --namespace specificai --create-namespace --values <your-values-file>.values.yaml
+  --version 4.14.8 --namespace specificai --create-namespace --values <your-values-file>.values.yaml
 ```
 
 Fill in a values file from [`values/`](values/) first — the

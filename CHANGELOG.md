@@ -1,5 +1,11 @@
 # Changelog
 
+## 4.14.8 — 2026-10-25
+
+`ner`
+
+- NER evaluation now uses the GPU for confidence calibration. On a GPU evaluation node the calibration pass ran on the CPU, so evaluating a large NER task could take days and stay at 50% progress. Calibration results are unchanged. `ner`
+
 ## 4.14.7 — 2026-10-20
 
 `infrastructure`
