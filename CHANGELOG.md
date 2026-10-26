@@ -1,5 +1,12 @@
 # Changelog
 
+## 4.14.9 — 2026-10-26
+
+`classification` `ner` `inference`
+
+- NER, classification and relation-extraction evaluation now run model predictions on the GPU. On a GPU evaluation node these predictions ran on the CPU, so evaluating a large task could take many hours or fail. Evaluation results are unchanged. `ner` `classification`
+- Relation extraction in entity-recognition models is now served on the GPU when the model is deployed or exported for a GPU. It previously ran on the CPU even on GPU machines. `ner` `inference`
+
 ## 4.14.8 — 2026-10-25
 
 `ner`

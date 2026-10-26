@@ -7,6 +7,10 @@ skip versions, apply every entry between your current version and the target,
 oldest first. The [changelog](changelog.md) lists everything else each version
 changes.
 
+## 4.14.9 — 2026-10-26
+
+No infrastructure change.
+
 ## 4.14.8 — 2026-10-25
 
 No infrastructure change.
