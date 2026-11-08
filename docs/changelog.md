@@ -1,5 +1,15 @@
 # Changelog
 
+## 4.14.10 — 2026-11-08
+
+`classification` `ner` `summarization` `content-generation` `ui`
+
+- Starting a training or a re-evaluation on a large task now responds in seconds instead of up to a minute and a half, and clicking the button again while the request is running no longer starts a second run. `ui`
+- A running evaluation can now be canceled through the API (`POST /cancel-evaluation`), and a re-evaluation also from the trash button on its progress card. Canceling stops the evaluation job and keeps the trained model, so it can be re-evaluated later. `classification` `ner` `summarization` `content-generation`
+- A re-evaluation now shows a progress card on the task page, like a training does. Evaluation progress also moves while predictions are computed and shows how many samples are done, instead of staying on one percentage for the whole step. Starting a training or a re-evaluation switches the task's main button back to Deploy right away. `ui`
+- Large NER evaluations no longer run out of memory and calibrate much faster. Calibration and threshold search share one model pass over a stratified sample of at most 20,000 validation documents (set with `EVALUATION_CALIBRATION_MAX_SAMPLES`), and the test set runs through the model once for metrics and calibration grading, instead of reading both sets in full two or three times. Predictions are computed, and model responses saved, in chunks. Test metrics still cover every test document. `ner`
+- NER evaluations of very large test sets no longer fail right after predictions finish. Metrics are counted document by document instead of padding every document to the longest one, so scoring 300,000 documents takes a few hundred MiB instead of over 10 GiB. The reported metrics are unchanged. `ner`
+
 ## 4.14.9 — 2026-10-26
 
 `classification` `ner` `inference`
