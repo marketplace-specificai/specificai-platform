@@ -1,5 +1,11 @@
 # Changelog
 
+## 4.14.11 — 2026-11-18
+
+`classification` `ner` `summarization` `content-generation`
+
+- When the same record was uploaded twice, once unreviewed and later reviewed with corrected labels, training now uses the reviewed copy. Before, it could keep the unreviewed copy and train on the uncorrected labels. `classification` `ner` `summarization` `content-generation`
+
 ## 4.14.10 — 2026-11-08
 
 `classification` `ner` `summarization` `content-generation` `ui`
