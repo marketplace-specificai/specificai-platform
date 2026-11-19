@@ -53,7 +53,7 @@ because Standard nodes are not guaranteed to ship one preinstalled. Autopilot
 installs the GPU driver and device plugin itself, so the chart's own DaemonSet
 stays disabled there. Each values file already sets this correctly.
 
-For the platform core, provision a dedicated node pool of `c3-standard-32`
+For the platform core, provision a dedicated node pool of `n2-standard-32`
 with a minimum of two nodes. That is 64 vCPU and 256 GB against a floor of
 26 vCPU and 50 GB, which leaves room for rolling upgrades and for the burst of
 short-lived pods the platform creates while a job starts. A dedicated pool
@@ -93,7 +93,7 @@ Google Cloud resource label under **Resource labels**.
 
 | Node pool | Instance type | Accelerator | Purpose |
 |---|---|---|---|
-| `gpu-high-performance` | Per region — see below | NVIDIA L40S | Generative and high-VRAM training. |
+| `gpu-high-performance` | `a2-highgpu-1g`, or `g4-standard-48` where A100 is unavailable | NVIDIA A100, or NVIDIA RTX PRO 6000 | Generative and high-VRAM training. |
 | `gpu-basic` | `g2-standard-8` | NVIDIA L4 | Playground inference and general GPU training. |
 | `gpu-low-performance` | `n1-standard-8` | NVIDIA T4 | Classification and NER training and evaluation. |
 | `cpu-high-performance` | Platform core pool | — | Shares the platform core capacity. |
@@ -109,12 +109,42 @@ customer-named pool to share.
 
 GPU accelerator availability varies by region and project quota. The
 `ComputeClass` tiers the chart renders on GKE Standard default to
-`nvidia-l4` on `g2-standard-8` for `gpu-basic` and `nvidia-tesla-t4` on
+`nvidia-tesla-a100` on `a2-highgpu-1g` for `gpu-high-performance`,
+`nvidia-l4` on `g2-standard-8` for `gpu-basic`, and `nvidia-tesla-t4` on
 `n1-standard-8` for `gpu-low-performance`; set the accelerator for each tier
-under `global.computeClasses.tiers` to match what your project can provision,
-including the high-performance tier. On Autopilot, the tiers are selected with
-the `cloud.google.com/gke-accelerator` node label instead, as the values file
-shows.
+under `global.computeClasses.tiers` to match what your project can provision.
+On Autopilot, the tiers are selected with the `cloud.google.com/gke-accelerator`
+node label instead, as the values file shows.
+
+A100 is offered in fewer regions than the other tiers' GPUs. Where your region
+has no A100, or as a fallback when it runs out, use the NVIDIA RTX PRO 6000 for
+`gpu-high-performance`: `nvidia-rtx-pro-6000` on `g4-standard-48`, one 96 GB
+GPU. It needs GKE `1.34.0-gke.1662000` or later on Standard and
+`1.34.1-gke.1829001` or later on Autopilot. On GKE Standard, add it to the
+tier's `fallbacks`; GKE tries the A100 first and moves to the next entry when
+it cannot get one:
+
+```yaml
+global:
+  computeClasses:
+    tiers:
+      gpuHighPerformance:
+        gpuType: nvidia-tesla-a100
+        machineType: a2-highgpu-1g
+        count: 1
+        fallbacks:
+          - gpuType: nvidia-rtx-pro-6000
+            machineType: g4-standard-48
+```
+
+On Autopilot, where the tier is selected by accelerator label, point it at the
+RTX PRO 6000 instead:
+
+```yaml
+global:
+  gpuHighPerformanceNodeSelector:
+    cloud.google.com/gke-accelerator: "nvidia-rtx-pro-6000"
+```
 
 If you prefer to pre-create GPU node pools yourself instead of letting GKE
 auto-create them, set `global.computeClasses.create` to `false` and name the
@@ -146,6 +176,23 @@ TLS on GKE is handled by Certificate Manager: attach your certificate map
 through the `networking.gke.io/certmap` annotation via
 `global.gateway.annotations`.
 
+Both GCP values files ship with the Gateway off (`global.gateway.enabled:
+false`) and the chart's default `nginx` Ingress on, which GKE has no
+controller for. Set these keys in your copy of the values file before you
+install:
+
+```yaml
+global:
+  ingress:
+    createIngress: false
+  gateway:
+    enabled: true
+    gatewayClassName: gke-l7-global-external-managed
+    namedAddress: "<your reserved static IP name>" # optional
+    annotations:
+      networking.gke.io/certmap: "<your certificate map name>"
+```
+
 The cluster needs outbound connectivity to the GCS bucket, to the database, to
 the registry the platform images are pulled from, and to the small set of
 third-party endpoints listed under **Outbound endpoints** below.
@@ -174,7 +221,9 @@ cors = [
 ]
 ```
 
-Add a lifecycle rule so temporary download artifacts do not accumulate.
+Add lifecycle rules so temporary download artifacts and staged dataset
+uploads do not accumulate. The platform does not delete the objects under
+these two prefixes itself.
 
 ```terraform
 lifecycle_rules = [
@@ -184,14 +233,41 @@ lifecycle_rules = [
       age            = 1
       matches_prefix = "downloads/"
     }
+  },
+  {
+    action = { type = "Delete" }
+    condition = {
+      age            = 1
+      matches_prefix = "temporary/"
+    }
   }
 ]
 ```
 
 Access is granted through Workload Identity Federation for GKE: create a
-Google Cloud service account, grant it the **Storage Bucket Admin** role on
-the bucket, and pass its email as `global.roleId`. The Kubernetes service
-accounts the chart creates authenticate as that service account.
+Google Cloud service account, grant it the **Storage Object Admin** role
+(`roles/storage.objectAdmin`) on the bucket, and pass its email as
+`global.roleId`. The chart annotates its Kubernetes service account,
+`specificai` (`global.serviceAccountName`), with that email. To let it act as
+the Google Cloud service account, grant the **Workload Identity User** role
+(`roles/iam.workloadIdentityUser`) on the Google Cloud service account to
+`serviceAccount:<your-project>.svc.id.goog[<namespace>/specificai]`.
+
+The same service account signs the URLs the browser uploads and downloads
+datasets through, using the IAM `signBlob` API. Grant it the **Service
+Account Token Creator** role (`roles/iam.serviceAccountTokenCreator`) on
+itself, not on the project, so it can sign only as itself. Without it,
+dataset uploads fail with `Permission iam.serviceAccounts.signBlob denied`.
+
+```bash
+SA=<your service account email>
+gcloud iam service-accounts add-iam-policy-binding "$SA" --project <your-project> \
+  --role roles/iam.workloadIdentityUser \
+  --member "serviceAccount:<your-project>.svc.id.goog[<namespace>/specificai]"
+gcloud iam service-accounts add-iam-policy-binding "$SA" --project <your-project> \
+  --role roles/iam.serviceAccountTokenCreator \
+  --member "serviceAccount:$SA"
+```
 
 **Vertex AI.** Enable the Vertex AI API (`aiplatform.googleapis.com`) in the
 project. Grant that same service account the **Vertex AI User** role
@@ -201,9 +277,13 @@ not allowed, these permissions are enough: `aiplatform.models.list`,
 `aiplatform.models.get`, `aiplatform.endpoints.predict`, and
 `aiplatform.endpoints.get`.
 
-Triton can use a dedicated inference service account on the same bucket. Pass
-its email as `specificai-inference.serviceAccount.roleId`. That account needs
-both roles:
+Triton runs as the platform's service account by default. To give it a
+dedicated, read-only inference service account on the same bucket instead,
+set `specificai-inference.serviceAccount.create` to `true` and pass the
+account's email as `specificai-inference.serviceAccount.roleId`. The chart
+then creates the Kubernetes service account `<release>-specificai-inference`;
+grant it the Workload Identity User role on the inference account the same
+way. That account needs both of these roles on the bucket:
 
 - `roles/storage.legacyBucketReader` — bucket get and list
   (`storage.buckets.get`).
@@ -258,7 +338,8 @@ on GCP. Only one broker is active at a time.
 
 Once the cluster, the bucket, and the database exist, choose the values file
 that matches your cluster mode — `gcp-standard.values.yaml` or
-`gcp-autopilot.values.yaml` — and fill in the placeholders it marks.
+`gcp-autopilot.values.yaml` — fill in the placeholders it marks, and set the
+Gateway keys shown under **Networking**.
 
 Then follow the [install guide](../install.md) to pull the chart — it is public
 on GitHub Container Registry and needs no credentials — install it with your
